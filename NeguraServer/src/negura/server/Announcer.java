@@ -78,7 +78,7 @@ public class Announcer extends Service {
 
             InetSocketAddress address = dataManager.userAddress(userId);
             try {
-                Comm.getMessage(address, message);
+                Comm.readMessage(address, message);
             } catch (Exception ex) { }
 
             // TODO:
@@ -113,7 +113,7 @@ public class Announcer extends Service {
 
         for (InetSocketAddress a : recentUsers) {
             try {
-                Comm.getMessage(a, send);
+                Comm.readMessage(a, send);
             } catch (Exception ex) { }
         }
     }

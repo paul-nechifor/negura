@@ -31,10 +31,11 @@ public class ClientRequestHandler implements RequestHandler {
     }
 
     public void handle(Socket socket) {
-        JsonObject message = Comm.readFromSocket(socket);
+        JsonObject message = Comm.readMessage(socket);
 
         String request = message.get("request").getAsString();
-        NeguraLog.info("Request '%s' from %s.", request, socket);
+        NeguraLog.info("Request '%s' from %s:%d.", request,
+                socket.getInetAddress().getHostAddress(), socket.getPort());
 
         // The handle_* functions needn't close the socket as it is
         // automatically closed after the function call.
@@ -62,7 +63,7 @@ public class ClientRequestHandler implements RequestHandler {
 
     private void handle_block_announce(Socket socket, JsonObject message)
             throws UnknownHostException, IOException {
-        Comm.writeToSocket(socket, new JsonObject());
+        Comm.writeMessage(socket, new JsonObject());
         socket.close();
         negura.getStateMaintainer().triggerBlockListUpdate();
     }
@@ -122,7 +123,7 @@ public class ClientRequestHandler implements RequestHandler {
 
     private void handle_filesystem_update(Socket socket, JsonObject message)
             throws IOException {
-        Comm.writeToSocket(socket, new JsonObject());
+        Comm.writeMessage(socket, new JsonObject());
         socket.close();
         negura.getStateMaintainer().triggerFileSystemUpdate();
     }

@@ -10,7 +10,7 @@ def register6():
     for i in xrange(6):
         out = open("out.sh", "w")
         out.write("""#!/bin/bash
-java -cp dist/Negura-Linux-64.jar negura.client.Main autoreg %d 127.0.0.1 5000
+java -cp ../NeguraClient/dist/Negura-*Linux64.jar negura.client.Main autoreg %d 127.0.0.1 5000
 sleep 9h
 """ % i)
         out.close()

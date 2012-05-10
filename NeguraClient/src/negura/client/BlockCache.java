@@ -56,7 +56,7 @@ public class BlockCache {
         }
         for (InetSocketAddress address : peers) {
             NeguraLog.info("Address: " + address);
-            int read = Comm.receiveBlock(buffer, 0, -1, blockId, address);
+            int read = Comm.readBlock(buffer, 0, -1, blockId, address);
             System.out.println("Read " + read + "  from block  " + blockId);
             if (read > 0) {
                 // Got the block.

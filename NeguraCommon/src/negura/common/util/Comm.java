@@ -13,10 +13,6 @@ import java.io.OutputStreamWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
-import java.net.UnknownHostException;
-import negura.common.socket.PoolSocketFactory;
-import org.apache.commons.pool.ObjectPool;
-import org.apache.commons.pool.impl.StackObjectPool;
 
 /**
  * Comunication utility functions.
@@ -28,7 +24,8 @@ public class Comm {
     private static String software;
     private static final Gson GSON = new Gson();
     private static final JsonParser PARSER = new JsonParser();
-    private static ObjectPool<Socket> pool;
+
+    public static InetAddress ADDRESS;
 
     public static final int BLOCK_FOUND = 1;
     public static final int BLOCK_BUSY = 2;
@@ -39,12 +36,16 @@ public class Comm {
 
     private Comm() { }
 
-    public static void init(String protocol, String software,
-            InetAddress address, int startPort, int endPort) {
+    // TODO: Properly dispose of the pool on shutdown.
+
+    public static void init(String protocol, String software) {
         Comm.protocol = protocol;
         Comm.software = software;
-        pool = new StackObjectPool<Socket>(
-                new PoolSocketFactory(address, startPort, endPort), 3);
+        try {
+            ADDRESS = Util.getFirstNetworkAddress();
+        } catch (Exception ex) {
+            NeguraLog.severe(ex);
+        }
     }
 
     // Returns a JSON object which already contains the required fields.
@@ -62,40 +63,36 @@ public class Comm {
         return ret;
     }
 
-    public static JsonObject getMessage(Socket socket, JsonObject message) {
-        writeToSocket(socket, message);
-        JsonObject ret = readFromSocket(socket);
+    public static JsonObject readMessage(Socket socket, JsonObject message) {
+        writeMessage(socket, message);
+        JsonObject ret = readMessage(socket);
         closeSocket(socket);
         return ret;
     }
 
-    public static JsonObject getMessage(InetSocketAddress address,
+    public static JsonObject readMessage(InetSocketAddress address,
             JsonObject message)  {
         JsonObject ret = null;
-        Socket socket = null;
+        Socket socket = new Socket();
         try {
-            socket = pool.borrowObject();
+            socket.bind(new InetSocketAddress(ADDRESS, 0));
             socket.connect(address);
-            ret = getMessage(socket, message);
+            ret = readMessage(socket, message);
         } catch (Exception ex) {
             NeguraLog.severe(ex);
         } finally {
-            try {
-                pool.returnObject(socket);
-            } catch (Exception ex) {
-                NeguraLog.severe(ex);
-            }
+            Comm.closeSocket(socket);
         }
         return ret;
     }
 
-    public static JsonObject getMessage(String ipAddress, int port,
+    public static JsonObject readMessage(String ipAddress, int port,
             JsonObject message) {
-        return getMessage(new InetSocketAddress(ipAddress, port), message);
+        return readMessage(new InetSocketAddress(ipAddress, port), message);
     }
 
     // Read the JSON message from the socket, but don't close it.
-    public static JsonObject readFromSocket(Socket socket) {
+    public static JsonObject readMessage(Socket socket) {
         try {
             BufferedReader reader = new BufferedReader(
                     new InputStreamReader(socket.getInputStream()));
@@ -108,7 +105,7 @@ public class Comm {
     }
 
     // Write a JSON message to a socket and shutdown the output.
-    public static void writeToSocket(Socket socket, JsonObject message) {
+    public static void writeMessage(Socket socket, JsonObject message) {
         try {
             BufferedWriter writer = new BufferedWriter(
                     new OutputStreamWriter(socket.getOutputStream()));
@@ -131,35 +128,8 @@ public class Comm {
     public static void terminateWithError(Socket socket, String errorMessage) {
         JsonObject message = newMessage();
         message.addProperty("error", errorMessage);
-        writeToSocket(socket, message);
+        writeMessage(socket, message);
         closeSocket(socket);
-    }
-
-    public static InputStream receiveBlockInputStream(int bid, int offset,
-            InetSocketAddress address) throws IOException {
-        JsonObject mesg = Comm.newMessage("up-block");
-        mesg.addProperty("block-id", bid);
-        if (offset > 0)
-            mesg.addProperty("offset", offset);
-        Socket socket = new Socket(address.getAddress(), address.getPort());
-        writeToSocket(socket, mesg);
-
-        InputStream in = socket.getInputStream();
-        DataInputStream dataIn = new DataInputStream(in);
-        int answerCode = dataIn.readInt();
-
-        switch (answerCode) {
-            // All is good, but ignore the length.
-            case BLOCK_FOUND:
-                int lenRead = dataIn.readInt();
-                break;
-            // All is bad.
-            case BLOCK_BUSY:
-            case BLOCK_NOT_FOUND:
-            default:
-                return null;
-        }
-        return in;
     }
 
     /**
@@ -172,7 +142,9 @@ public class Comm {
      * @param address       The address of the peer.
      * @return              The number of bytes read, or -1 if failed.
      */
-    public static int receiveBlock(byte[] buffer, int offset, int length,
+
+    // TODO: e foarte aiurea totul pe-aici. trebuie revizuit.
+    public static int readBlock(byte[] buffer, int offset, int length,
             int bid, InetSocketAddress address) {
         JsonObject mesg = Comm.newMessage("up-block");
         mesg.addProperty("block-id", bid);
@@ -181,14 +153,15 @@ public class Comm {
         if (length > 0)
             mesg.addProperty("length", length);
 
-        Socket socket = null;
+        Socket socket = new Socket();
         try {
             try {
-                socket = new Socket(address.getAddress(), address.getPort());
+                socket.bind(new InetSocketAddress(ADDRESS, 0));
+                socket.connect(address);
             } catch (Exception ex) {
                 return -1;
             }
-            writeToSocket(socket, mesg);
+            writeMessage(socket, mesg);
 
             InputStream in = socket.getInputStream();
             DataInputStream din = new DataInputStream(in);
@@ -213,8 +186,7 @@ public class Comm {
         } catch (Exception ex) {
             NeguraLog.severe(ex);
         } finally {
-            if (socket != null)
-                Comm.closeSocket(socket);
+            Comm.closeSocket(socket);
         }
 
         return -1;

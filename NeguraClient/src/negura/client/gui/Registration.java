@@ -203,7 +203,7 @@ public class Registration {
         JsonObject serverInfoRequest = Comm.newMessage("server-info");
 
         try {
-            serverInfo = Comm.getMessage(serverAddress, serverInfoRequest);
+            serverInfo = Comm.readMessage(serverAddress, serverInfoRequest);
         } catch (Exception ex) {
             message(I18n.get("errorContactingServer") + "\n\n" +
                     Util.getStackTrace(ex));
@@ -280,7 +280,7 @@ public class Registration {
 
         JsonObject regResp = null;
         try {
-            regResp = Comm.getMessage(serverAddress, regMsg);
+            regResp = Comm.readMessage(serverAddress, regMsg);
         } catch (Exception ex) {
             message(I18n.get("errorContactingServer") + "\n\n" +
                     Util.getStackTrace(ex));
@@ -393,7 +393,7 @@ public class Registration {
         JsonObject serverInfo = null;
 
         try {
-            serverInfo = Comm.getMessage(serverIp, serverPort,
+            serverInfo = Comm.readMessage(serverIp, serverPort,
                     serverInfoRequest);
         } catch (Exception ex) {
             NeguraLog.severe(ex);
@@ -418,7 +418,7 @@ public class Registration {
         JsonObject regMsgResp = null;
 
         try {
-            regMsgResp = Comm.getMessage(serverIp, serverPort, regMsg);
+            regMsgResp = Comm.readMessage(serverIp, serverPort, regMsg);
         } catch (Exception ex) {
             NeguraLog.severe(ex);
         }

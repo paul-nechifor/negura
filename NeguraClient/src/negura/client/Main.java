@@ -1,14 +1,8 @@
 package negura.client;
 
 import java.io.File;
-import java.net.InetAddress;
-import java.net.SocketException;
-import java.net.UnknownHostException;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import negura.client.gui.Registration;
 import negura.common.util.Comm;
-import negura.common.util.NeguraLog;
 import negura.common.util.Util;
 import org.apache.ftpserver.ftplet.FtpException;
 
@@ -24,13 +18,7 @@ public class Main {
     private Main() { }
 
     public static void main(String[] args) throws FtpException {
-        InetAddress localAddress = null;
-        try {
-            localAddress = Util.getFirstNetworkAddress();
-        } catch (Exception ex) {
-            NeguraLog.severe(ex);
-        }
-        Comm.init("1.0", "Negura 0.1", localAddress, 30000, 60000);
+        Comm.init("1.0", "Negura 0.1");
 
         File configFile = null;
 

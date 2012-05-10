@@ -32,10 +32,11 @@ public class ServerRequestHandler implements RequestHandler {
     }
 
     public void handle(Socket socket) {
-        JsonObject message = Comm.readFromSocket(socket);
+        JsonObject message = Comm.readMessage(socket);
 
         String request = message.get("request").getAsString();
-        NeguraLog.info("Request '%s' from %s.", request, socket);
+        NeguraLog.info("Request '%s' from %s:%d.", request,
+                socket.getInetAddress().getHostAddress(), socket.getPort());
 
         // The handle_* functions needn't close the socket as it is
         // automatically closed after the function call.
@@ -80,7 +81,7 @@ public class ServerRequestHandler implements RequestHandler {
             serverInfo.add(e.getKey(), e.getValue());
         }
 
-        Comm.writeToSocket(socket, serverInfo);
+        Comm.writeMessage(socket, serverInfo);
     }
 
     private void handle_registration(Socket socket, JsonObject message)
@@ -109,7 +110,7 @@ public class ServerRequestHandler implements RequestHandler {
         JsonObject resp = Comm.newMessage();
         resp.addProperty("registration", "accepted");
         resp.addProperty("uid", uid);
-        Comm.writeToSocket(socket, resp);
+        Comm.writeMessage(socket, resp);
     }
 
     private void registrationError(Socket socket, String errorMessage)
@@ -117,7 +118,7 @@ public class ServerRequestHandler implements RequestHandler {
         JsonObject message = Comm.newMessage();
         message.addProperty("registration", "failed");
         message.addProperty("registration-failed-reason", errorMessage);
-        Comm.writeToSocket(socket, message);
+        Comm.writeMessage(socket, message);
         socket.close();
     }
     
@@ -141,13 +142,13 @@ public class ServerRequestHandler implements RequestHandler {
         resp.addProperty("opid", opid);
         resp.add("block-ids", blocks);
 
-        Comm.writeToSocket(socket, resp);
+        Comm.writeMessage(socket, resp);
     }
 
     private void handle_add_operation(Socket socket, JsonObject message)
             throws IOException {
         // For now, there is no message to send back.
-        Comm.writeToSocket(socket, new JsonObject());
+        Comm.writeMessage(socket, new JsonObject());
         socket.close();
 
         Operation op = Operation.fromJson(message.getAsJsonObject("op"));
@@ -202,12 +203,12 @@ public class ServerRequestHandler implements RequestHandler {
 
         ret.add("blocks", retList);
 
-        Comm.writeToSocket(socket, ret);
+        Comm.writeMessage(socket, ret);
     }
 
     private void handle_have_blocks(Socket socket, JsonObject message)
             throws SQLException, IOException {
-        Comm.writeToSocket(socket, new JsonObject());
+        Comm.writeMessage(socket, new JsonObject());
         socket.close();
 
         int uid = message.get("uid").getAsInt();
@@ -230,7 +231,7 @@ public class ServerRequestHandler implements RequestHandler {
         }
         JsonObject resp = Comm.newMessage();
         resp.add("blocks", blocks);
-        Comm.writeToSocket(socket, resp);
+        Comm.writeMessage(socket, resp);
     }
 
     private void handle_filesystem_state(Socket socket, JsonObject message)
@@ -244,12 +245,12 @@ public class ServerRequestHandler implements RequestHandler {
             ops.add(op.toJson());
         }
         resp.add("operations", ops);
-        Comm.writeToSocket(socket, resp);
+        Comm.writeMessage(socket, resp);
     }
 
     private void handle_trigger_fs_update(Socket socket, JsonObject message)
             throws IOException {
-        Comm.writeToSocket(socket, new JsonObject());
+        Comm.writeMessage(socket, new JsonObject());
         socket.close();
         announcer.triggerSendNewOps();
     }

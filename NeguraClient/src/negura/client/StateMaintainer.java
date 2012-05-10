@@ -111,7 +111,7 @@ public class StateMaintainer extends Service {
         // TODO: specify from where the new blocks should be listed.
         JsonObject mesg = Comm.newMessage("get-block-list");
         mesg.addProperty("uid", cm.getUserId());
-        JsonObject resp = Comm.getMessage(cm.getServerSocketAddress(), mesg);
+        JsonObject resp = Comm.readMessage(cm.getServerSocketAddress(), mesg);
 
         List<Integer> blocks = new ArrayList<Integer>();
         for (JsonElement e : resp.getAsJsonArray("blocks")) {
@@ -127,7 +127,7 @@ public class StateMaintainer extends Service {
         
         JsonObject mesg = Comm.newMessage("filesystem-state");
         mesg.addProperty("after", fsView.getLastOperationId());
-        JsonObject resp = Comm.getMessage(cm.getServerSocketAddress(), mesg);
+        JsonObject resp = Comm.readMessage(cm.getServerSocketAddress(), mesg);
 
         List<Operation> ops = new ArrayList<Operation>();
         for (JsonElement e : resp.getAsJsonArray("operations"))
@@ -143,7 +143,7 @@ public class StateMaintainer extends Service {
         }
 
         for (InetSocketAddress address : peers) {
-            int read = Comm.receiveBlock(buffer, 0, -1, id, address);
+            int read = Comm.readBlock(buffer, 0, -1, id, address);
             if (read <= 0) // Couldn't get block.
                 continue;
 
@@ -165,7 +165,7 @@ public class StateMaintainer extends Service {
         mesg.add("blocks", list);
 
         try {
-            Comm.getMessage(cm.getServerSocketAddress(), mesg);
+            Comm.readMessage(cm.getServerSocketAddress(), mesg);
             NeguraLog.info("Sent downloaded blocks: " + completed);
             completed.clear();
         } catch (Exception ex) {
