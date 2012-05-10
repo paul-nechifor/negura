@@ -91,13 +91,7 @@ public class Negura {
             } catch (InterruptedException ex) { }
 
             JsonObject mesg = Comm.newMessage("trigger-fs-update");
-            try {
-                Comm.getAnswer(serverAddress, mesg);
-            } catch (UnknownHostException ex) {
-                NeguraLog.severe(ex);
-            } catch (IOException ex) {
-                NeguraLog.severe(ex);
-            }
+            Comm.getMessage(serverAddress, mesg);
         }
 
 //        if (cm.getPort() == 20000) {
@@ -177,7 +171,7 @@ public class Negura {
             JsonObject req = Comm.newMessage("allocate-operation");
             req.addProperty("number-of-blocks", nrBlocks);
 
-            JsonObject respIds = Comm.getAnswer(serverAddress, req);
+            JsonObject respIds = Comm.getMessage(serverAddress, req);
 
             req = Comm.newMessage("add-operation");
             req.addProperty("uid", cm.getUserId());
@@ -225,7 +219,7 @@ public class Negura {
             op.addProperty("hash",
                     DatatypeConverter.printHexBinary(fileHash.digest()));
 
-            Comm.getAnswer(serverAddress, req);
+            Comm.getMessage(serverAddress, req);
 
             cm.pushBlocks(newBlocks, false);
         } catch (Exception ex) {

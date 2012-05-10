@@ -27,6 +27,7 @@ public class Comm {
     private static String protocol;
     private static String software;
     private static final Gson GSON = new Gson();
+    private static final JsonParser PARSER = new JsonParser();
     private static ObjectPool<Socket> pool;
 
     public static final int BLOCK_FOUND = 1;
@@ -43,7 +44,7 @@ public class Comm {
         Comm.protocol = protocol;
         Comm.software = software;
         pool = new StackObjectPool<Socket>(
-                new PoolSocketFactory(address, startPort, endPort));
+                new PoolSocketFactory(address, startPort, endPort), 3);
     }
 
     // Returns a JSON object which already contains the required fields.
@@ -61,15 +62,36 @@ public class Comm {
         return ret;
     }
 
-    public static JsonObject getAnswer(String ipAddress, int port,
-            JsonObject message) throws UnknownHostException, IOException {
-        Socket socket = new Socket(ipAddress, port);
-        return askForResponse(socket, message);
+    public static JsonObject getMessage(Socket socket, JsonObject message) {
+        writeToSocket(socket, message);
+        JsonObject ret = readFromSocket(socket);
+        closeSocket(socket);
+        return ret;
     }
 
-    public static JsonObject getAnswer(InetSocketAddress address,
-            JsonObject message) throws UnknownHostException, IOException {
-        return getAnswer(address.getHostName(), address.getPort(), message);
+    public static JsonObject getMessage(InetSocketAddress address,
+            JsonObject message)  {
+        JsonObject ret = null;
+        Socket socket = null;
+        try {
+            socket = pool.borrowObject();
+            socket.connect(address);
+            ret = getMessage(socket, message);
+        } catch (Exception ex) {
+            NeguraLog.severe(ex);
+        } finally {
+            try {
+                pool.returnObject(socket);
+            } catch (Exception ex) {
+                NeguraLog.severe(ex);
+            }
+        }
+        return ret;
+    }
+
+    public static JsonObject getMessage(String ipAddress, int port,
+            JsonObject message) {
+        return getMessage(new InetSocketAddress(ipAddress, port), message);
     }
 
     // Read the JSON message from the socket, but don't close it.
@@ -77,9 +99,7 @@ public class Comm {
         try {
             BufferedReader reader = new BufferedReader(
                     new InputStreamReader(socket.getInputStream()));
-
-            JsonParser parser = new JsonParser();
-            return parser.parse(reader).getAsJsonObject();
+            return PARSER.parse(reader).getAsJsonObject();
         } catch (Exception ex) {
             NeguraLog.severe(ex);
         }
@@ -98,13 +118,6 @@ public class Comm {
         } catch (Exception ex) {
             NeguraLog.severe(ex);
         }
-    }
-
-    public static JsonObject askForResponse(Socket socket, JsonObject message) {
-        writeToSocket(socket, message);
-        JsonObject ret = readFromSocket(socket);
-        closeSocket(socket);
-        return ret;
     }
 
     private static void closeSocket(Socket socket) {

@@ -38,7 +38,7 @@ public class PeerCache {
         mesg.add("blocks", list);
         JsonObject resp = null;
         try {
-            resp = Comm.getAnswer(cm.getServerSocketAddress(), mesg);
+            resp = Comm.getMessage(cm.getServerSocketAddress(), mesg);
         } catch (Exception ex) {
             LOGGER.log(Level.WARNING, "Server isn't responding.", ex);
             return;
