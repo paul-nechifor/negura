@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="NeguraServer" default="default" basedir=".">
+    <description>Builds, tests, and runs the project NeguraServer.</description>
+    <import file="nbproject/build-impl.xml"/>
+
+    <property file="build-info.properties"/>
+    <property name="build.number" value="${build.major.number}.${build.minor.number}.${build.revision.number}"/>
+    
+    <target name="-post-jar">
+        <!-- Increment the revision number. -->
+        <propertyfile file="build-info.properties">
+            <entry key="build.revision.number" type="int" operation="+" default="1" />
+        </propertyfile>
+
+        <jar jarfile="dist/NeguraServer-${build.number}.jar">
+            <zipfileset src="${dist.jar}" excludes="META-INF/*" />
+            <zipfileset src="../Libraries/gson-2.1.jar" excludes="META-INF/*" />
+            <zipfileset src="../Libraries/postgresql-9.1-901.jdbc4.jar" excludes="META-INF/*" />
+            <zipfileset src="../Libraries/commons-dbcp-1.4.jar" excludes="META-INF/*" />
+            <zipfileset src="../Libraries/commons-pool-1.6.jar" excludes="META-INF/*" />
+            <zipfileset src="../NeguraCommon/dist/NeguraCommon.jar" excludes="META-INF/*" />
+            <manifest>
+                <attribute name="Main-Class" value="negura.server.Main"/>
+            </manifest>
+        </jar>
+
+        <!-- Delete the unnecessary files. -->
+        <delete dir="dist/lib"/>
+        <delete file="dist/README.TXT"/>
+        <delete file="${dist.jar}"/>
+    </target>
+</project>

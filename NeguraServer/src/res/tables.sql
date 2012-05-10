@@ -1,0 +1,52 @@
+DROP TABLE IF EXISTS blocks CASCADE;
+DROP TABLE IF EXISTS operations CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+DROP TABLE IF EXISTS allocated CASCADE;
+DROP TABLE IF EXISTS completed CASCADE;
+DROP SEQUENCE IF EXISTS userSeq;
+DROP SEQUENCE IF EXISTS operationSeq;
+DROP SEQUENCE IF EXISTS blockSeq;
+
+CREATE TABLE operations (
+    id INTEGER PRIMARY KEY,
+    path TEXT,
+    newpath TEXT,
+    signature TEXT,
+    dat INTEGER,
+    size BIGINT,
+    hash TEXT,
+    type VARCHAR(6)
+);
+
+CREATE TABLE users (
+    id INTEGER PRIMARY KEY,
+    ip TEXT,
+    port INTEGER,
+    nblocks INTEGER,
+    pkey TEXT,
+    newindex INTEGER,
+    bcount INTEGER
+);
+
+CREATE TABLE blocks (
+    id INTEGER PRIMARY KEY,
+    hash TEXT,
+    opid INTEGER REFERENCES operations(id) ON DELETE CASCADE
+);
+
+CREATE TABLE allocated (
+    id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    bid INTEGER REFERENCES blocks(id) ON DELETE CASCADE,
+    orderb INTEGER
+);
+
+CREATE TABLE completed (
+    id INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    bid INTEGER REFERENCES blocks(id) ON DELETE CASCADE
+);
+
+CREATE SEQUENCE userSeq START 1;
+CREATE SEQUENCE operationSeq START 1;
+CREATE SEQUENCE blockSeq START 1;
+
+COMMIT;

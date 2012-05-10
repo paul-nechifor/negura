@@ -1,0 +1,62 @@
+package negura.client;
+
+import java.io.File;
+import java.net.InetAddress;
+import java.net.SocketException;
+import java.net.UnknownHostException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import negura.client.gui.Registration;
+import negura.common.util.Comm;
+import negura.common.util.NeguraLog;
+import negura.common.util.Util;
+import org.apache.ftpserver.ftplet.FtpException;
+
+//Icon from http://www.komodomedia.com/.
+
+/**
+ * Main class which manages the command line arguments.
+ * @author Paul Nechifor
+ */
+public class Main {
+    public static final String SHORT_NAME = "negura";
+
+    private Main() { }
+
+    public static void main(String[] args) throws FtpException {
+        InetAddress localAddress = null;
+        try {
+            localAddress = Util.getFirstNetworkAddress();
+        } catch (Exception ex) {
+            NeguraLog.severe(ex);
+        }
+        Comm.init("1.0", "Negura 0.1", localAddress, 30000, 60000);
+
+        File configFile = null;
+
+        // If there are no arguments, start with the default configuration file
+        // or start the registration.
+        if (args.length == 0) {
+            configFile = new File(new File(Util.getUserConfigDir(),
+                    SHORT_NAME), "config.json");
+            if (!configFile.exists()) {
+                Registration r = new Registration();
+                r.loopUntilClosed();
+                if (!r.isRegisteredSuccessfully())
+                    return;
+            }
+        } else {
+            if (args[0].equals("autoreg") && args.length == 4) {
+                configFile = Registration.testRegister(
+                        Integer.parseInt(args[1]), args[2],
+                        Integer.parseInt(args[3]));
+            } else {
+                System.err.println("Invalid parameters.");
+                System.exit(1);
+            }
+        }
+
+        Negura negura = new Negura(configFile);
+        negura.start();
+    }
+}
