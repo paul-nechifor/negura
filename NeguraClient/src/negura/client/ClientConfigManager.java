@@ -21,11 +21,13 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.xml.bind.DatatypeConverter;
 import negura.common.util.Util;
 import negura.common.data.Operation;
+import negura.common.util.NeguraLog;
 import negura.common.util.RSA;
 
 /**
@@ -55,6 +57,8 @@ public class ClientConfigManager {
     private JsonObject serverInfo;
     private NeguraFsView fsView;
     private final ArrayList<Integer> blockList = new ArrayList<Integer>();
+    private File logFile;
+
     // These are saved in a single array in the config.
     private HashMap<String, Integer> hashToId = new HashMap<String, Integer>();
     private HashMap<Integer, String> idToHash = new HashMap<Integer, String>();
@@ -63,11 +67,13 @@ public class ClientConfigManager {
     private HashMap<String, Integer> storeCodeToId
             = new HashMap<String, Integer>();
     private ArrayList<Integer> downloadQueue = new ArrayList<Integer>();
+
     // These are not saved.
     private File configPath;
     private MessageDigest blockHash;
     private final PeerCache peerCache;
     private final BlockCache blockCache;
+    private FileHandler fileLogHandler;
 
     private ClientConfigManager(File configPath) {
         this.configPath = configPath;
@@ -81,6 +87,16 @@ public class ClientConfigManager {
 
         peerCache = new PeerCache(this);
         blockCache = new BlockCache(this);
+    }
+
+    private void loadFileHandler() {
+        try {
+            fileLogHandler = new FileHandler(logFile.getAbsolutePath(), true);
+            fileLogHandler.setFormatter(NeguraLog.FORMATTER);
+            NeguraLog.addHandler(fileLogHandler);
+        } catch (Exception ex) {
+            NeguraLog.severe(ex);
+        }
     }
 
     public static ClientConfigManager load(File configPath)
@@ -114,6 +130,8 @@ public class ClientConfigManager {
             cm.blockList.add(e.getAsInt());
         }
 
+        cm.logFile = new File(config.get("log-file").getAsString());
+
         for (JsonElement e : config.getAsJsonArray("downloaded-blocks")) {
             JsonObject o = e.getAsJsonObject();
             Integer id = Integer.parseInt(o.get("i").getAsString());
@@ -135,6 +153,8 @@ public class ClientConfigManager {
         }
 
         cm.blockCache.load();
+
+        cm.loadFileHandler();
 
         return cm;
     }
@@ -158,6 +178,9 @@ public class ClientConfigManager {
         cm.serverInfo = serverInfo;
         cm.fsView = new NeguraFsView(cm);
         cm.blockCache.load();
+        cm.logFile = new File(configPath.getParentFile(), "log.txt");
+
+        cm.loadFileHandler();
 
         return cm;
     }
@@ -199,6 +222,8 @@ public class ClientConfigManager {
 
         config.add("block-list", blockListSaved);
         config.add("downloaded-blocks", downloadedBlocks);
+
+        config.addProperty("log-file", logFile.getAbsolutePath());
 
         try {
             FileWriter w = new FileWriter(configPath);
@@ -410,6 +435,14 @@ public class ClientConfigManager {
 
     public synchronized int getServerInfoBlockSize() {
         return serverInfo.get("block-size").getAsInt();
+    }
+
+    public synchronized File getLogFile() {
+        return logFile;
+    }
+
+    public synchronized void flushFileLogger() {
+        fileLogHandler.flush();
     }
 
     /**

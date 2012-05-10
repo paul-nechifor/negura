@@ -10,20 +10,17 @@ import negura.client.I18n;
 import negura.common.util.Comm;
 import negura.common.util.NeguraLog;
 import negura.common.util.RSA;
+import negura.common.util.SwtUtil;
 import negura.common.util.Util;
 import net.miginfocom.swt.MigLayout;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StackLayout;
-import org.eclipse.swt.events.DisposeEvent;
-import org.eclipse.swt.events.DisposeListener;
 import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.VerifyEvent;
 import org.eclipse.swt.events.VerifyListener;
-import org.eclipse.swt.graphics.Font;
-import org.eclipse.swt.graphics.FontData;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Button;
@@ -94,7 +91,7 @@ public class Registration {
         // Page one positioning.
         page1 = new Composite(shell, SWT.NONE);
         page1.setLayout(new MigLayout("insets 10","[grow]"));
-        Label newConnectionLb = newComp(Label.class, page1, SWT.LEFT,
+        Label newConnectionL = newComp(Label.class, page1, SWT.LEFT,
                 "wrap 30px");
         Label addressL = newComp(Label.class, page1, SWT.LEFT, "wrap");
         addressT = newComp(Text.class, page1, SWT.BORDER,
@@ -103,8 +100,8 @@ public class Registration {
                 "wrap, align right");
 
         // Page one options.
-        newConnectionLb.setText(I18n.get("newConnection"));
-        changeLabelFontSize(newConnectionLb, 16);
+        newConnectionL.setText(I18n.get("newConnection"));
+        SwtUtil.changeControlFontSize(newConnectionL, display, 16);
         addressL.setText(I18n.get("serverAddress"));
         continueB.setText(I18n.get("continue"));
         continueB.addSelectionListener(new SelectionAdapter() {
@@ -141,7 +138,7 @@ public class Registration {
 
         // Page two options.
         settingsL.setText(I18n.get("settings"));
-        changeLabelFontSize(settingsL, 16);
+        SwtUtil.changeControlFontSize(settingsL, display, 16);
         serverNameL.setText(I18n.get("serverName"));
         blockSizeL.setText(I18n.get("blockSize"));
         minBlocksL.setText(I18n.get("minimumBlocks"));
@@ -349,21 +346,6 @@ public class Registration {
         int nLeft = (bds.width - p.x) / 2;
         int nTop = (bds.height - p.y) / 2;
         shell.setBounds(nLeft, nTop, p.x, p.y);
-    }
-
-    private void changeLabelFontSize(Label label, int size) {
-        FontData[] fontData = label.getFont().getFontData();
-        for (int i = 0; i < fontData.length; ++i)
-            fontData[i].setHeight(size);
-        final Font newFont = new Font(display, fontData);
-        label.setFont(newFont);
-
-        // Since you created the font, you must dispose it
-        label.addDisposeListener(new DisposeListener() {
-            public void widgetDisposed(DisposeEvent e) {
-                newFont.dispose();
-            }
-        });
     }
 
     // Returns the location of the configuration file or null on failure.

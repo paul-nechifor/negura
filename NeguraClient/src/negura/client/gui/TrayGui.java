@@ -11,6 +11,8 @@ import negura.client.ftp.NeguraFtpServer;
 import negura.common.Service;
 import negura.common.util.Util;
 import org.eclipse.swt.SWT;
+import org.eclipse.swt.events.ShellEvent;
+import org.eclipse.swt.events.ShellListener;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
@@ -26,6 +28,11 @@ import org.eclipse.swt.widgets.TrayItem;
  * @author Paul Nechifor
  */
 public class TrayGui extends Service {
+    private static final String[] IMAGES = new String[] {
+        "trayicon", "/res/icons/trayicon_24.png",
+        "exit", "/res/icons/exit_16.png"
+    };
+
     private final Shell mainShell;
     private final Display display;
     private final Map<String, Image> icons = new HashMap<String, Image>();
@@ -33,10 +40,7 @@ public class TrayGui extends Service {
     private final Negura negura;
     private final ClientConfigManager cm;
 
-    private static final String[] IMAGES = new String[] {
-        "trayicon", "/res/icons/trayicon_24.png",
-        "exit", "/res/icons/exit_16.png"
-    };
+    private LogWindow logWindow = null;
 
     public TrayGui(Negura negura, ClientConfigManager cm) {
         this.negura = negura;
@@ -75,6 +79,7 @@ public class TrayGui extends Service {
         final MenuItem startFtpMi = n(menu, SWT.CHECK, I18n.get("startFtp"), null);
         startFtpMi.setText(I18n.get("startFtp"));
         MenuItem refreshMi = n(menu, SWT.PUSH, I18n.get("refreshFileSystem"));
+        MenuItem viewLogMi = n(menu, SWT.PUSH, "Open log");
         n(menu, SWT.SEPARATOR, null);
         MenuItem exitMi = n(menu, SWT.PUSH, I18n.get("exit"),
                 icons.get("exit"));
@@ -108,6 +113,11 @@ public class TrayGui extends Service {
                 negura.getStateMaintainer().triggerFileSystemUpdate();
             }
         });
+        viewLogMi.addListener(SWT.Selection, new Listener() {
+            public void handleEvent(Event event) {
+                openLogWindow();
+            }
+        });
         exitMi.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
                 negura.shutdown();
@@ -122,6 +132,13 @@ public class TrayGui extends Service {
                 negura.shutdown();
             }
         });
+    }
+
+    private void openLogWindow() {
+        if (logWindow == null || logWindow.isClosed())
+            logWindow = new LogWindow(display, cm);
+        else
+            logWindow.forceActive();
     }
 
     private void tip(String text, String message) {

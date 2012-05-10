@@ -20,7 +20,7 @@ public class NeguraLog {
     private static boolean QUIT_ON_SEVERE = true;
     private static boolean IS_CONSOLE_HANDLER_SET = false;
     private static final ConsoleHandler CONSOLE_HANDLER = new ConsoleHandler();
-    public static final Formatter DEFAULT_FORMATTER = new Formatter() {
+    public static final Formatter FORMATTER = new Formatter() {
         @Override
         public String format(LogRecord record) {
             String time = new SimpleDateFormat("HH:mm:ss")
@@ -48,7 +48,7 @@ public class NeguraLog {
         // Disable the default handler which prints to the console.
         LOGGER.setUseParentHandlers(false);
         // Add the custom handler.
-        CONSOLE_HANDLER.setFormatter(DEFAULT_FORMATTER);
+        CONSOLE_HANDLER.setFormatter(FORMATTER);
         addDefaultConsoleHandler();
     }
 

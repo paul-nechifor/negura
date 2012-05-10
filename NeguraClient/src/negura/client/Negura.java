@@ -15,6 +15,8 @@
 
 package negura.client;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import negura.client.fs.NeguraFile;
 import negura.client.fs.NeguraFileInputStream;
 import com.google.gson.JsonArray;
@@ -30,6 +32,7 @@ import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.logging.FileHandler;
 import javax.xml.bind.DatatypeConverter;
 import negura.client.ftp.NeguraFtpServer;
 import negura.client.gui.TrayGui;
