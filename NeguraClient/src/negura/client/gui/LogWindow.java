@@ -53,7 +53,7 @@ public class LogWindow {
 
         shell = new Shell(display);
         shell.setText("Log");
-        shell.setSize(500, 350);
+        shell.setSize(455, 368);
         shell.setLayout(new FillLayout());
         StyledText styledText = new StyledText(shell, SWT.BORDER |
                 SWT.V_SCROLL | SWT.MULTI | SWT.WRAP);

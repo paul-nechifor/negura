@@ -84,7 +84,8 @@ public class NeguraLog {
         LOGGER.log(level, message, throwable);
 
         if (level == Level.SEVERE && QUIT_ON_SEVERE) {
-            CONSOLE_HANDLER.flush();
+            for (Handler h : LOGGER.getHandlers())
+                h.flush();
             System.exit(1);
         }
     }

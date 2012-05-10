@@ -356,6 +356,11 @@ public class Registration {
         File dir = new File(new File(System.getProperty("user.home"), "util"),
                 strCode);
         String path = dir.getAbsolutePath();
+        if (dir.exists()) {
+            if (!Util.removeDirectory(dir)) {
+                NeguraLog.severe("Failed to delete dir: %s", dir);
+            }
+        }
         // Creating the directory.
         if (!dir.mkdir()) {
             NeguraLog.severe("Couldn't create dir '%s'.", path);

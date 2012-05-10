@@ -11,8 +11,6 @@ import negura.client.ftp.NeguraFtpServer;
 import negura.common.Service;
 import negura.common.util.Util;
 import org.eclipse.swt.SWT;
-import org.eclipse.swt.events.ShellEvent;
-import org.eclipse.swt.events.ShellListener;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
@@ -55,6 +53,8 @@ public class TrayGui extends Service {
             icons.put(IMAGES[i], img);
         }
         load();
+
+        openLogWindow();
     }
 
     private MenuItem n(Menu menu, int type, String name, Image icon) {
