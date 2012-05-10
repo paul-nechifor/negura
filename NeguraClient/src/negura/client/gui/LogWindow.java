@@ -78,7 +78,7 @@ public class LogWindow {
         shell.open();
 
         // Flush the file handler so that I can load everything.
-        cm.flushFileLogger();
+        NeguraLog.flushAll();
         try {
             FileReader in = new FileReader(cm.getLogFile());
             char[] buffer = new char[8 * 1024];

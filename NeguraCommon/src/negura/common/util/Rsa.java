@@ -16,8 +16,8 @@ import javax.xml.bind.DatatypeConverter;
  *
  * @author Paul Nechifor
  */
-public class RSA {
-    private RSA() { }
+public class Rsa {
+    private Rsa() { }
     
     public static RSAPublicKey publicKeyFromString(String string) {
         try {

@@ -52,6 +52,11 @@ public class NeguraLog {
         addDefaultConsoleHandler();
     }
 
+    public static void flushAll() {
+        for (Handler h : LOGGER.getHandlers())
+            h.flush();
+    }
+
     public static void addHandler(Handler handler) {
         LOGGER.addHandler(handler);
     }
@@ -84,8 +89,7 @@ public class NeguraLog {
         LOGGER.log(level, message, throwable);
 
         if (level == Level.SEVERE && QUIT_ON_SEVERE) {
-            for (Handler h : LOGGER.getHandlers())
-                h.flush();
+            flushAll();
             System.exit(1);
         }
     }

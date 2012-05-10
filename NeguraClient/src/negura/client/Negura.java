@@ -15,8 +15,6 @@
 
 package negura.client;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import negura.client.fs.NeguraFile;
 import negura.client.fs.NeguraFileInputStream;
 import com.google.gson.JsonArray;
@@ -24,15 +22,12 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.security.MessageDigest;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.logging.FileHandler;
 import javax.xml.bind.DatatypeConverter;
 import negura.client.ftp.NeguraFtpServer;
 import negura.client.gui.TrayGui;
@@ -51,9 +46,7 @@ public class Negura {
 
     public Negura(File configFile) {
         try {
-            cm = ClientConfigManager.load(configFile);
-        } catch (FileNotFoundException ex) {
-            NeguraLog.severe(ex);
+            cm = new ClientConfigManager(configFile);
         } catch (IOException ex) {
             NeguraLog.severe(ex);
         }
@@ -90,7 +83,7 @@ public class Negura {
             addDir(new File("/home/p/tmp/negura"), "");
 
             try {
-                Thread.sleep(2000);
+                Thread.sleep(6000);
             } catch (InterruptedException ex) { }
 
             JsonObject mesg = Comm.newMessage("trigger-fs-update");
@@ -113,7 +106,11 @@ public class Negura {
     public void shutdown() {
         requestServer.stop();
         trayGui.stop();
-        cm.save();
+        try {
+            cm.save();
+        } catch (IOException ex) {
+            NeguraLog.severe(ex);
+        }
         if (ftpServer != null)
             ftpServer.stop();
         // TODO: see why not all the threads are stopping. Is it the FTP server?
@@ -122,7 +119,7 @@ public class Negura {
 
     // Checks to see if everythins is in order and tries to repair if possible.
     public void startCheck() {
-        File blockDir = new File(cm.getBlockDir());
+        File blockDir = cm.getBlockDir();
         if (!blockDir.exists())
             blockDir.mkdir();
 

@@ -2,14 +2,22 @@ package negura.client.gui;
 
 import com.google.gson.JsonObject;
 import java.io.File;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.KeyPair;
+import java.security.interfaces.RSAPublicKey;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import negura.client.ClientConfigManager;
+import negura.client.ClientConfigManager.Builder;
 import negura.client.Main;
 import negura.client.I18n;
+import negura.common.data.RsaKeyPair;
+import negura.common.data.ServerInfo;
+import negura.common.json.Json;
 import negura.common.util.Comm;
 import negura.common.util.NeguraLog;
-import negura.common.util.RSA;
+import negura.common.util.Rsa;
 import negura.common.util.SwtUtil;
 import negura.common.util.Util;
 import net.miginfocom.swt.MigLayout;
@@ -75,7 +83,7 @@ public class Registration {
     private final Text ftpPortT;
     private final Button doneB;
     private InetSocketAddress serverAddress;
-    private JsonObject serverInfo;
+    private ServerInfo serverInfo;
     private int blockSize = -1;
     private int minBlocks;
     private boolean registeredSuccessfully = false;
@@ -200,20 +208,19 @@ public class Registration {
         JsonObject serverInfoRequest = Comm.newMessage("server-info");
 
         try {
-            serverInfo = Comm.readMessage(serverAddress, serverInfoRequest);
+            JsonObject o = Comm.readMessage(serverAddress, serverInfoRequest);
+            serverInfo = Json.fromJsonObject(o, ServerInfo.class);
         } catch (Exception ex) {
             message(I18n.get("errorContactingServer") + "\n\n" +
                     Util.getStackTrace(ex));
             return;
         }
-        
-        String serverName = serverInfo.get("name").getAsString();
-        blockSize = serverInfo.get("block-size").getAsInt();
-        minBlocks = serverInfo.get("minimum-blocks").getAsInt();
+
+        minBlocks = serverInfo.minimumBlocks;
         int defaultBlocks = minBlocks * 2;
 
-        serverNameValL.setText(serverName);
-        blockSizeValL.setText((blockSize / 1024) + " KiB");
+        serverNameValL.setText(serverInfo.name);
+        blockSizeValL.setText((serverInfo.blockSize / 1024) + " KiB");
         minBlocksValL.setText(Integer.toString(minBlocks));
         blocksToStoreT.setText(Integer.toString(defaultBlocks));
         blocksToStoreS.setMinimum(minBlocks);
@@ -249,8 +256,8 @@ public class Registration {
         }
 
         // Creating the directories if they need to be created.
-        File blockDir = new File(new File(Util.getUserDataDir(), Main.SHORT_NAME),
-                "blocks");
+        File blockDir = new File(new File(Util.getUserDataDir(), 
+                Main.SHORT_NAME), "blocks");
         File configFileDir = new File(Util.getUserConfigDir(),
                 Main.SHORT_NAME);
         if (!blockDir.exists() && !blockDir.mkdirs()) {
@@ -264,14 +271,18 @@ public class Registration {
         }
         File configFile = new File(configFileDir, "config.json");
 
-        KeyPair keyPair = RSA.generateKeyPair(1024);
+        RsaKeyPair rsaKeyPair = new RsaKeyPair();
+        KeyPair keyPair = Rsa.generateKeyPair(1024);
         if (keyPair == null) {
             message(I18n.get("failedRsaKeyPair"));
             System.exit(1);
         }
+        // TODO: encrypt the private key.
+        rsaKeyPair.publicKey = (RSAPublicKey) keyPair.getPublic();
+        rsaKeyPair.encryptedPrivateKey = "To encrypt later.";
 
         JsonObject regMsg = Comm.newMessage("registration");
-        regMsg.addProperty("public-key", RSA.toString(keyPair.getPublic()));
+        regMsg.addProperty("public-key", Rsa.toString(keyPair.getPublic()));
         regMsg.addProperty("number-of-blocks", numberOfBlocks);
         regMsg.addProperty("port", servicePort);
 
@@ -293,13 +304,16 @@ public class Registration {
         
         int uid = regResp.get("uid").getAsInt();
 
-        ClientConfigManager cm = ClientConfigManager.createWith(configFile,
-                serverAddress.getHostName(), serverAddress.getPort(),
-                serverInfo, blockDir.getAbsolutePath(), uid);
-        cm.setPort(servicePort);
-        cm.setFtpPort(ftpPort);
-        cm.setKeyPair(keyPair);
-        cm.save();
+        ClientConfigManager cm = new Builder(configFile)
+                .serverAddress(serverAddress)
+                .storedBlocks(serverInfo.minimumBlocks).serverInfo(serverInfo)
+                .blockDir(blockDir).userId(uid).servicePort(servicePort)
+                .ftpPort(ftpPort).keyPair(rsaKeyPair).threadPoolSize(9).build();
+        try {
+            cm.save();
+        } catch (IOException ex) {
+            message("Failed to save the config file.");
+        }
 
         message(I18n.get("successRegistration"), SWT.ICON_INFORMATION);
         registeredSuccessfully = true;
@@ -377,30 +391,36 @@ public class Registration {
         }
 
         JsonObject serverInfoRequest = Comm.newMessage("server-info");
-        JsonObject serverInfo = null;
+        ServerInfo serverInfo = null;
+        InetSocketAddress serverAddress = new InetSocketAddress(serverIp,
+                serverPort);
 
         try {
-            serverInfo = Comm.readMessage(serverIp, serverPort,
-                    serverInfoRequest);
+            JsonObject o = Comm.readMessage(serverAddress, serverInfoRequest);
+            serverInfo = Json.fromJsonObject(o, ServerInfo.class);
         } catch (Exception ex) {
             NeguraLog.severe(ex);
         }
 
-        KeyPair keyPair = RSA.generateKeyPair(1024);
+        RsaKeyPair rsaKeyPair = new RsaKeyPair();
+        KeyPair keyPair = Rsa.generateKeyPair(1024);
+        // TODO: encrypt the private key.
+        rsaKeyPair.publicKey = (RSAPublicKey) keyPair.getPublic();
+        rsaKeyPair.encryptedPrivateKey = "To encrypt later.";
 
-        ClientConfigManager cm = ClientConfigManager.createWith(configFile,
-                serverIp, serverPort, serverInfo, blockDirPath, -1);
-        cm.setPort(port);
-        cm.setFtpPort(2220 + code);
-        cm.setKeyPair(keyPair);
-        if (port == 20000)
-            cm.setStoredBlocks(700);
+        int storedBlocks = serverInfo.minimumBlocks;
+        if (code == 0)
+            storedBlocks = 700;
 
+        Builder builder = new Builder(configFile).serverAddress(serverAddress)
+                .serverInfo(serverInfo).blockDir(blockDir).servicePort(port)
+                .storedBlocks(storedBlocks).threadPoolSize(9)
+                .ftpPort(2220 + code).keyPair(rsaKeyPair);
 
         JsonObject regMsg = Comm.newMessage("registration");
-        regMsg.addProperty("public-key", RSA.toString(cm.getPublicKey()));
-        regMsg.addProperty("number-of-blocks", cm.getStoredBlocks());
-        regMsg.addProperty("port", cm.getPort());
+        regMsg.addProperty("public-key", Rsa.toString(rsaKeyPair.publicKey));
+        regMsg.addProperty("number-of-blocks", storedBlocks);
+        regMsg.addProperty("port", port);
 
         JsonObject regMsgResp = null;
 
@@ -413,11 +433,14 @@ public class Registration {
         if (!regMsgResp.get("registration").getAsString().equals("accepted")) {
             NeguraLog.severe("Registration failed: " +
                     regMsgResp.get("registration-failed-reason").getAsString());
-            System.exit(1);
         }
 
-        cm.setUserId(regMsgResp.get("uid").getAsInt());
-        cm.save();
+        builder.userId(regMsgResp.get("uid").getAsInt());
+        try {
+            builder.build().save();
+        } catch (IOException ex) {
+            NeguraLog.severe(ex);
+        }
 
         return configFile;
     }
