@@ -75,4 +75,23 @@ public class Rsa {
     public static String toString(Key key) {
         return DatatypeConverter.printBase64Binary(key.getEncoded());
     }
+
+    /**
+     * Returns the key in hex format with lines no longer than max characters.
+     * @param key           The key.
+     * @param max           The maximum length of the line.
+     * @return              The key in hex format broken into multiple lines.
+     */
+    public static String toString(Key key, int max) {
+        String hex = toString(key);
+
+        StringBuilder ret = new StringBuilder(hex.length());
+        int len = hex.length() - max;
+        int i;
+        for (i = 0; i < len; i += max)
+            ret.append(hex.substring(i, i + max)).append('\n');
+        ret.append(hex.substring(i, hex.length()));
+
+        return ret.toString();
+    }
 }

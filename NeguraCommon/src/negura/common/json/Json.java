@@ -5,6 +5,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
@@ -12,6 +13,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
+import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import negura.common.data.BlockIndexer;
 
@@ -21,6 +23,7 @@ import negura.common.data.BlockIndexer;
  */
 public class Json {
     private static final Gson gson;
+    private static final JsonParser PARSER = new JsonParser();
 
     private Json() { }
 
@@ -29,6 +32,8 @@ public class Json {
         builder.registerTypeAdapter(File.class, new FileTypeConverter());
         builder.registerTypeAdapter(RSAPublicKey.class,
                 new RSAPublicKeyTypeConverter());
+        builder.registerTypeAdapter(RSAPrivateKey.class,
+                new RSAPrivateKeyTypeConverter());
         builder.registerTypeAdapter(BlockIndexer.class,
                 new BlockIndexerTypeConverter());
         builder.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_DASHES);

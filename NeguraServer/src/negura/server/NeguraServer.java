@@ -1,5 +1,6 @@
 package negura.server;
 
+import java.io.File;
 import java.io.IOException;
 import negura.common.RequestServer;
 import negura.common.util.NeguraLog;
@@ -11,14 +12,17 @@ public class NeguraServer {
     private RequestServer requestServer;
     private Announcer announcer;
 
-    public NeguraServer(String configPath) {
-        cm = new ServerConfigManager(configPath);
+    public NeguraServer(File configFile) {
+        try {
+            cm = new ServerConfigManager(configFile);
+        } catch (IOException ex) {
+            NeguraLog.severe(ex, "Couldn't read config file.");
+        }
         dataManager = new DataManager(cm);
 
         announcer = new Announcer(dataManager);
         requestHandler = new ServerRequestHandler(cm, dataManager, announcer);
-        requestServer = new RequestServer(cm.getPort(), cm.getThreadPoolSize(),
-                requestHandler);
+        requestServer = new RequestServer(cm.getPort(), 10, requestHandler);
     }
 
     public void run() {

@@ -3,6 +3,7 @@ package negura.server;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import java.io.IOException;
 import java.net.Socket;
@@ -15,6 +16,7 @@ import java.util.Map.Entry;
 import negura.common.util.Comm;
 import negura.common.RequestHandler;
 import negura.common.data.Operation;
+import negura.common.json.Json;
 import negura.common.util.NeguraLog;
 
 public class ServerRequestHandler implements RequestHandler {
@@ -75,7 +77,9 @@ public class ServerRequestHandler implements RequestHandler {
     }
 
     private void handle_server_info(Socket socket, JsonObject message) {
-        JsonObject serverInfo = cm.getServerInfo();
+        // TODO: This shouldn't be so convoluted.
+        JsonObject serverInfo = new JsonParser().parse(Json.toString(
+                cm.getServerInfo())).getAsJsonObject();
 
         for (Entry<String, JsonElement> e : Comm.newMessage().entrySet()) {
             serverInfo.add(e.getKey(), e.getValue());

@@ -6,8 +6,8 @@ import java.io.IOException;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import negura.client.ClientConfigManager;
+import negura.common.gui.Swt;
 import negura.common.util.NeguraLog;
-import negura.common.util.SwtUtil;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.events.ShellEvent;
@@ -58,7 +58,7 @@ public class LogWindow {
         StyledText styledText = new StyledText(shell, SWT.BORDER |
                 SWT.V_SCROLL | SWT.MULTI | SWT.WRAP);
         styledText.setEditable(false);
-        SwtUtil.changeControlFontSize(styledText, display, 8);
+        Swt.changeControlFontSize(styledText, display, 8);
         
         shell.addShellListener(new ShellListener() {
             public void shellClosed(ShellEvent se) {

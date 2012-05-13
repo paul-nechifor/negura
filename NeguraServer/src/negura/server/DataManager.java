@@ -43,7 +43,8 @@ public class DataManager {
         connectionPool.setUsername(cm.getDatabaseUser());
         connectionPool.setPassword(cm.getDatabasePassword());
         connectionPool.setUrl(cm.getDatabaseUrl());
-        connectionPool.setMaxActive(cm.getThreadPoolSize());
+        // TODO: Thise options should be in the config file.
+        connectionPool.setMaxActive(10);
         connectionPool.setMaxIdle(2);
     }
 

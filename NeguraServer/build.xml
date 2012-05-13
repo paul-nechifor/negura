@@ -12,13 +12,15 @@
             <entry key="build.revision.number" type="int" operation="+" default="1" />
         </propertyfile>
 
-        <jar jarfile="dist/NeguraServer-${build.number}.jar">
+        <jar jarfile="dist/NeguraServer-${build.number}_Linux64.jar">
             <zipfileset src="${dist.jar}" excludes="META-INF/*" />
+            <zipfileset src="../NeguraCommon/dist/NeguraCommon.jar" excludes="META-INF/*" />
             <zipfileset src="../Libraries/gson-2.1.jar" excludes="META-INF/*" />
             <zipfileset src="../Libraries/postgresql-9.1-901.jdbc4.jar" excludes="META-INF/*" />
             <zipfileset src="../Libraries/commons-dbcp-1.4.jar" excludes="META-INF/*" />
             <zipfileset src="../Libraries/commons-pool-1.6.jar" excludes="META-INF/*" />
-            <zipfileset src="../NeguraCommon/dist/NeguraCommon.jar" excludes="META-INF/*" />
+            <zipfileset src="../Libraries/miglayout-4.0-swt.jar" excludes="META-INF/*" />
+            <zipfileset src="../Libraries/swt-3.7.2-gtk-linux-x86_64.jar" excludes="META-INF/*" />
             <manifest>
                 <attribute name="Main-Class" value="negura.server.Main"/>
             </manifest>

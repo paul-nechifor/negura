@@ -13,6 +13,7 @@ import java.io.OutputStreamWriter;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import negura.common.json.Json;
 
 /**
  * Comunication utility functions.
@@ -22,7 +23,6 @@ import java.net.Socket;
 public class Comm {
     private static String protocol;
     private static String software;
-    private static final Gson GSON = new Gson();
     private static final JsonParser PARSER = new JsonParser();
 
     public static InetAddress ADDRESS;
@@ -109,7 +109,7 @@ public class Comm {
         try {
             BufferedWriter writer = new BufferedWriter(
                     new OutputStreamWriter(socket.getOutputStream()));
-            writer.write(GSON.toJson(message));
+            writer.write(Json.toString(message));
             writer.flush();
             socket.shutdownOutput();
         } catch (Exception ex) {

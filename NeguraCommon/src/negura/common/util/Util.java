@@ -27,7 +27,23 @@ import java.util.List;
  * @author Paul Nechifor
  */
 public class Util {
+    /** All the units that can exist with a long. */
+    private static final String[] UNITS = new String[]{"B", "KiB", "MiB", "GiB",
+            "TiB", "PiB", "EiB"};
+
     private Util() { }
+
+    /**
+     * Returns the long as a string with it's binary prefix unit.
+     */
+    public static String bytesWithUnit(long bytes) {
+        for (int i = 0; i < UNITS.length; i++) {
+            if (bytes < 1024)
+                return bytes + " " + UNITS[i];
+            bytes /= 1024;
+        }
+        return bytes + " " + UNITS[UNITS.length - 1];
+    }
 
     public static JsonObject readJsonFromFile(String path)
             throws FileNotFoundException, IOException {

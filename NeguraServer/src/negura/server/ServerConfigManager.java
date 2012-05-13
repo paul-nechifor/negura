@@ -1,60 +1,71 @@
 package negura.server;
 
-import com.google.gson.JsonObject;
-import java.io.FileNotFoundException;
+import java.io.File;
 import java.io.IOException;
-import negura.common.util.NeguraLog;
-import negura.common.util.Util;
+import java.security.interfaces.RSAPrivateKey;
+import negura.common.data.ServerInfo;
+import negura.common.json.Json;
 
 /**
  * Manages the server configuration.
  * @author Paul Nechifor
  */
 public class ServerConfigManager {
-    private JsonObject config;
+    public static class Builder {
+        public transient File configFile;
 
-    public ServerConfigManager(String configPath) {
-        try {
-            config = Util.readJsonFromFile(configPath);
-        } catch (FileNotFoundException ex) {
-            NeguraLog.severe(ex);
-        } catch (IOException ex) {
-            NeguraLog.severe(ex);
+        public ServerInfo serverInfo;
+        public int virtualDiskBlocks;
+        public int port;
+        public String concurrencyOptions;
+        public String databaseUrl;
+        public String databaseUser;
+        public String databasePassword; // TODO: Change this.
+        public RSAPrivateKey privateKey;
+        public RSAPrivateKey adminPrivateKey;
+
+        public Builder(File configFile) {
+            this.configFile = configFile;
+            this.serverInfo = new ServerInfo();
         }
     }
 
+    private Builder builder;
+
+    public ServerConfigManager(Builder builder) {
+        this.builder = builder;
+    }
+
+    public ServerConfigManager(File configFile) throws IOException {
+        this.builder = Json.fromFile(configFile, Builder.class);
+        this.builder.configFile = configFile;
+    }
+
+    public void save() throws IOException {
+        Json.toFile(builder.configFile, builder);
+    }
+
     public String getDatabaseUrl() {
-        return config.get("database-url").getAsString();
+        return builder.databaseUrl;
     }
 
     public String getDatabaseUser() {
-        return config.get("database-user").getAsString();
+        return builder.databaseUser;
     }
 
     public String getDatabasePassword() {
-        return config.get("database-password").getAsString();
+        return builder.databaseUser;
     }
 
     public int getPort() {
-        return config.get("port").getAsInt();
-    }
-
-    public int getThreadPoolSize() {
-        return config.get("thread-pool-size").getAsInt();
+        return builder.port;
     }
 
     public int getMinimumBlocks() {
-        return config.get("minimum-blocks").getAsInt();
+        return builder.serverInfo.minimumBlocks;
     }
 
-    public JsonObject getServerInfo() {
-        JsonObject ret = new JsonObject();
-        ret.add("name", config.get("name"));
-        ret.add("public-key", config.get("public-key"));
-        ret.add("admin-public-key", config.get("admin-public-key"));
-        ret.add("block-size", config.get("block-size"));
-        ret.add("minimum-blocks", config.get("minimum-blocks"));
-        ret.add("check-in-time", config.get("check-in-time"));
-        return ret;
+    public ServerInfo getServerInfo() {
+        return builder.serverInfo;
     }
 }

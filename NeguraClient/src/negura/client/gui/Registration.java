@@ -6,19 +6,17 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.KeyPair;
 import java.security.interfaces.RSAPublicKey;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import negura.client.ClientConfigManager;
 import negura.client.ClientConfigManager.Builder;
 import negura.client.Main;
 import negura.client.I18n;
 import negura.common.data.RsaKeyPair;
 import negura.common.data.ServerInfo;
+import negura.common.gui.Swt;
 import negura.common.json.Json;
 import negura.common.util.Comm;
 import negura.common.util.NeguraLog;
 import negura.common.util.Rsa;
-import negura.common.util.SwtUtil;
 import negura.common.util.Util;
 import net.miginfocom.swt.MigLayout;
 import org.eclipse.swt.SWT;
@@ -29,11 +27,8 @@ import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.events.VerifyEvent;
 import org.eclipse.swt.events.VerifyListener;
-import org.eclipse.swt.graphics.Point;
-import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
@@ -49,25 +44,6 @@ import org.eclipse.swt.widgets.Text;
  * @author Paul Nechifor
  */
 public class Registration {
-    private static final VerifyListener INTEGER_VERIFIER =
-            new VerifyListener() {
-        @Override
-        public void verifyText(final VerifyEvent event) {
-            switch (event.keyCode) {
-                case 0:                // To allow setText()
-                case SWT.BS:           // Backspace
-                case SWT.DEL:          // Delete
-                case SWT.HOME:         // Home
-                case SWT.END:          // End
-                case SWT.ARROW_LEFT:   // Left arrow
-                case SWT.ARROW_RIGHT:  // Right arrow
-                    return;
-            }
-            if (!Character.isDigit(event.character))
-                event.doit = false;  // Disallow the action.
-        }
-    };
-
     private Display display;
     private final Shell shell;
     private final StackLayout stackLayout;
@@ -96,20 +72,22 @@ public class Registration {
         stackLayout = new StackLayout();
         shell.setLayout(stackLayout);
 
+        Swt.getMonospaceFont(display, 12);
+
         // Page one positioning.
         page1 = new Composite(shell, SWT.NONE);
         page1.setLayout(new MigLayout("insets 10","[grow]"));
-        Label newConnectionL = newComp(Label.class, page1, SWT.LEFT,
+        Label newConnectionL = Swt.n(Label.class, page1, SWT.LEFT,
                 "wrap 30px");
-        Label addressL = newComp(Label.class, page1, SWT.LEFT, "wrap");
-        addressT = newComp(Text.class, page1, SWT.BORDER,
+        Label addressL = Swt.n(Label.class, page1, SWT.LEFT, "wrap");
+        addressT = Swt.n(Text.class, page1, SWT.BORDER,
                 "wrap push, w 200!");
-        Button continueB = newComp(Button.class, page1, SWT.PUSH,
+        Button continueB = Swt.n(Button.class, page1, SWT.PUSH,
                 "wrap, align right");
 
         // Page one options.
         newConnectionL.setText(I18n.get("newConnection"));
-        SwtUtil.changeControlFontSize(newConnectionL, display, 16);
+        Swt.changeControlFontSize(newConnectionL, display, 16);
         addressL.setText(I18n.get("serverAddress"));
         continueB.setText(I18n.get("continue"));
         continueB.addSelectionListener(new SelectionAdapter() {
@@ -123,35 +101,35 @@ public class Registration {
         // Page two positioning.
         page2 = new Composite(shell, SWT.NONE);
         page2.setLayout(new MigLayout("insets 10","[right][150!][max]"));
-        Label settingsL = newComp(Label.class, page2, SWT.LEFT,
+        Label settingsL = Swt.n(Label.class, page2, SWT.LEFT,
                 "span, align left, wrap 30px");
-        Label serverNameL = newComp(Label.class, page2, SWT.LEFT, null);
-        serverNameValL = newComp(Label.class, page2, SWT.LEFT, "w max, wrap");
-        Label blockSizeL = newComp(Label.class, page2, SWT.LEFT, null);
-        blockSizeValL = newComp(Label.class, page2, SWT.LEFT, "w max, wrap");
-        Label minBlocksL = newComp(Label.class, page2, SWT.LEFT, null);
-        minBlocksValL = newComp(Label.class, page2, SWT.LEFT,
+        Label serverNameL = Swt.n(Label.class, page2, SWT.LEFT, null);
+        serverNameValL = Swt.n(Label.class, page2, SWT.LEFT, "w max, wrap");
+        Label blockSizeL = Swt.n(Label.class, page2, SWT.LEFT, null);
+        blockSizeValL = Swt.n(Label.class, page2, SWT.LEFT, "w max, wrap");
+        Label minBlocksL = Swt.n(Label.class, page2, SWT.LEFT, null);
+        minBlocksValL = Swt.n(Label.class, page2, SWT.LEFT,
                 "w max, wrap 30px");
-        Label blocksToStoreL = newComp(Label.class, page2, SWT.LEFT, null);
-        blocksToStoreT = newComp(Text.class, page2, SWT.BORDER, "w max");
-        blocksToStoreS = newComp(Slider.class, page2, SWT.HORIZONTAL,
+        Label blocksToStoreL = Swt.n(Label.class, page2, SWT.LEFT, null);
+        blocksToStoreT = Swt.n(Text.class, page2, SWT.BORDER, "w max");
+        blocksToStoreS = Swt.n(Slider.class, page2, SWT.HORIZONTAL,
                 "w max, wrap");
-        Label spaceToBeUsedL = newComp(Label.class, page2, SWT.LEFT, null);
-        spaceToBeUsedValL = newComp(Label.class, page2, SWT.LEFT,
+        Label spaceToBeUsedL = Swt.n(Label.class, page2, SWT.LEFT, null);
+        spaceToBeUsedValL = Swt.n(Label.class, page2, SWT.LEFT,
                 "w max, wrap");
-        Label ftpPortL = newComp(Label.class, page2, SWT.LEFT, null);
-        ftpPortT = newComp(Text.class, page2, SWT.BORDER, "w max, wrap push");
-        doneB = newComp(Button.class, page2, SWT.PUSH,
+        Label ftpPortL = Swt.n(Label.class, page2, SWT.LEFT, null);
+        ftpPortT = Swt.n(Text.class, page2, SWT.BORDER, "w max, wrap push");
+        doneB = Swt.n(Button.class, page2, SWT.PUSH,
                 "span, align right");
 
         // Page two options.
         settingsL.setText(I18n.get("settings"));
-        SwtUtil.changeControlFontSize(settingsL, display, 16);
+        Swt.changeControlFontSize(settingsL, display, 16);
         serverNameL.setText(I18n.get("serverName"));
         blockSizeL.setText(I18n.get("blockSize"));
         minBlocksL.setText(I18n.get("minimumBlocks"));
         blocksToStoreL.setText(I18n.get("blocksToStore"));
-        blocksToStoreT.addVerifyListener(INTEGER_VERIFIER);
+        blocksToStoreT.addVerifyListener(Swt.INTEGER_VERIFIER);
         blocksToStoreT.addModifyListener(new ModifyListener() {
             @Override
             public void modifyText(ModifyEvent me) {
@@ -163,6 +141,7 @@ public class Registration {
             }
         });
         blocksToStoreS.addListener(SWT.Selection, new Listener() {
+            @Override
             public void handleEvent(Event e) {
                 int value = blocksToStoreS.getSelection();
                 updateUsedBlocks(value, true);
@@ -170,7 +149,7 @@ public class Registration {
         });
         spaceToBeUsedL.setText(I18n.get("usedSpace"));
         ftpPortL.setText(I18n.get("ftpPort"));
-        ftpPortT.addVerifyListener(INTEGER_VERIFIER);
+        ftpPortT.addVerifyListener(Swt.INTEGER_VERIFIER);
         ftpPortT.setText("43210");
         doneB.setText(I18n.get("done"));
         doneB.addSelectionListener(new SelectionAdapter() {
@@ -186,7 +165,7 @@ public class Registration {
     }
 
     public void loopUntilClosed() {
-        centerShell(shell);
+        Swt.centerShell(shell);
         shell.open();
         while (!shell.isDisposed())
             if (!display.readAndDispatch())
@@ -344,23 +323,7 @@ public class Registration {
         spaceToBeUsedValL.setText(inMiB + " MiB");
     }
 
-    private <T extends Control> T newComp(Class<T> type, Composite c, int i,
-            String layoutData) {
-        try {
-            T t = type.getDeclaredConstructor(Composite.class, int.class).newInstance(c, i);
-            if (layoutData != null)
-                t.setLayoutData(layoutData);
-            return t;
-        } catch (Exception ex) { throw new AssertionError(); }
-    }
 
-    private void centerShell(Shell shell) {
-        Rectangle bds = shell.getDisplay().getBounds();
-        Point p = shell.getSize();
-        int nLeft = (bds.width - p.x) / 2;
-        int nTop = (bds.height - p.y) / 2;
-        shell.setBounds(nLeft, nTop, p.x, p.y);
-    }
 
     // Returns the location of the configuration file or null on failure.
     public static File testRegister(int code, String serverIp, int serverPort) {
