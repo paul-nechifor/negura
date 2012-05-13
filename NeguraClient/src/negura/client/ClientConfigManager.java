@@ -40,7 +40,7 @@ public class ClientConfigManager {
         private File blockDir;
         private int servicePort;
         private int ftpPort;
-        private int threadPoolSize;
+        private String threadPoolOptions;
         private RsaKeyPair keyPair;
         private int userId;
         private ServerInfo serverInfo;
@@ -80,8 +80,8 @@ public class ClientConfigManager {
             return this;
         }
 
-        public Builder threadPoolSize(int threadPoolSize) {
-            this.threadPoolSize = threadPoolSize;
+        public Builder threadPoolOptions(String threadPoolOptions) {
+            this.threadPoolOptions = threadPoolOptions;
             return this;
         }
 
@@ -322,8 +322,8 @@ public class ClientConfigManager {
         return builder.userId;
     }
 
-    public synchronized int getThreadPoolSize() {
-        return builder.threadPoolSize;
+    public synchronized String getThreadPoolOptions() {
+        return builder.threadPoolOptions;
     }
 
     public synchronized File getLogFile() {

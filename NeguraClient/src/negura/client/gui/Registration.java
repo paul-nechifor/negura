@@ -15,6 +15,7 @@ import negura.common.data.ServerInfo;
 import negura.common.gui.Swt;
 import negura.common.json.Json;
 import negura.common.util.Comm;
+import negura.common.util.MsgBox;
 import negura.common.util.NeguraLog;
 import negura.common.util.Rsa;
 import negura.common.util.Util;
@@ -25,15 +26,12 @@ import org.eclipse.swt.events.ModifyEvent;
 import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.events.VerifyEvent;
-import org.eclipse.swt.events.VerifyListener;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
-import org.eclipse.swt.widgets.MessageBox;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Slider;
 import org.eclipse.swt.widgets.Text;
@@ -180,7 +178,8 @@ public class Registration {
     private void stepTwo() {
         serverAddress = Comm.stringToSocketAddress(addressT.getText().trim());
         if (serverAddress == null) {
-            message(I18n.format("invalidAddressForm", "10.20.30.40:5000"));
+            MsgBox.warning(shell, I18n.format("invalidAddressForm",
+                    "10.20.30.40:5000"));
             return;
         }
 
@@ -190,7 +189,7 @@ public class Registration {
             JsonObject o = Comm.readMessage(serverAddress, serverInfoRequest);
             serverInfo = Json.fromJsonObject(o, ServerInfo.class);
         } catch (Exception ex) {
-            message(I18n.get("errorContactingServer") + "\n\n" +
+            MsgBox.warning(shell, I18n.get("errorContactingServer") + "\n\n" +
                     Util.getStackTrace(ex));
             return;
         }
@@ -222,7 +221,7 @@ public class Registration {
             numberOfBlocks = Integer.parseInt(blocksToStoreT.getText());
         } catch (NumberFormatException ex) { }
         if (numberOfBlocks < minBlocks) {
-            message(I18n.get("invalidNumberOfBlocks"));
+            MsgBox.warning(shell, I18n.get("invalidNumberOfBlocks"));
             return;
         }
 
@@ -230,7 +229,7 @@ public class Registration {
             ftpPort = Integer.parseInt(ftpPortT.getText());
         } catch (NumberFormatException ex) { }
         if (ftpPort < 1 || ftpPort >= (256 * 256)) {
-            message(I18n.get("invalidFtpPort"));
+            MsgBox.warning(shell, I18n.get("invalidFtpPort"));
             return;
         }
 
@@ -240,21 +239,25 @@ public class Registration {
         File configFileDir = new File(Util.getUserConfigDir(),
                 Main.SHORT_NAME);
         if (!blockDir.exists() && !blockDir.mkdirs()) {
-            message(I18n.format("failedBlockDir", blockDir.getAbsoluteFile()));
-            System.exit(1);
+            MsgBox.error(shell, I18n.format("failedBlockDir",
+                    blockDir.getAbsoluteFile()));
+            shell.dispose();
+            return;
         }
         if (!configFileDir.exists() && !configFileDir.mkdirs()) {
-            message(I18n.format("failedConfigDir",
+            MsgBox.error(shell, I18n.format("failedConfigDir",
                     configFileDir.getAbsoluteFile()));
-            System.exit(1);
+            shell.dispose();
+            return;
         }
         File configFile = new File(configFileDir, "config.json");
 
         RsaKeyPair rsaKeyPair = new RsaKeyPair();
         KeyPair keyPair = Rsa.generateKeyPair(1024);
         if (keyPair == null) {
-            message(I18n.get("failedRsaKeyPair"));
-            System.exit(1);
+            MsgBox.error(shell, I18n.get("failedRsaKeyPair"));
+            shell.dispose();
+            return;
         }
         // TODO: encrypt the private key.
         rsaKeyPair.publicKey = (RSAPublicKey) keyPair.getPublic();
@@ -269,7 +272,7 @@ public class Registration {
         try {
             regResp = Comm.readMessage(serverAddress, regMsg);
         } catch (Exception ex) {
-            message(I18n.get("errorContactingServer") + "\n\n" +
+            MsgBox.warning(shell, I18n.get("errorContactingServer") + "\n\n" +
                     Util.getStackTrace(ex));
             return;
         }
@@ -277,7 +280,8 @@ public class Registration {
         if (!regResp.get("registration").getAsString().equals("accepted")) {
             String reason = regResp.get("registration-failed-reason")
                     .getAsString();
-            message(I18n.get("failedRegistration") + "\n\n" + reason);
+            MsgBox.warning(shell, I18n.get("failedRegistration") + "\n\n" +
+                    reason);
             return;
         }
         
@@ -287,18 +291,25 @@ public class Registration {
                 .serverAddress(serverAddress)
                 .storedBlocks(serverInfo.minimumBlocks).serverInfo(serverInfo)
                 .blockDir(blockDir).userId(uid).servicePort(servicePort)
-                .ftpPort(ftpPort).keyPair(rsaKeyPair).threadPoolSize(9).build();
+                .ftpPort(ftpPort).keyPair(rsaKeyPair).threadPoolOptions(
+                "core-pool-size=0;maximum-pool-size=15;keep-alive-time=30")
+                .build();
+
         try {
             cm.save();
         } catch (IOException ex) {
-            message("Failed to save the config file.");
+            MsgBox.error(shell, "Failed to save the config file.");
+            shell.dispose();
+            return;
         }
 
-        message(I18n.get("successRegistration"), SWT.ICON_INFORMATION);
+        shell.setVisible(false);
+        MsgBox.info(shell, I18n.get("successRegistration"));
         registeredSuccessfully = true;
         shell.dispose();
     }
 
+    /*
     private void message(String message) {
         message(message, SWT.ICON_WARNING);
     }
@@ -309,6 +320,8 @@ public class Registration {
         messageBox.setMessage(message);
         int buttonID = messageBox.open();
     }
+     *
+     */
 
     private void updateUsedBlocks(int n, boolean fromSlider) {
         if (fromSlider)
@@ -377,7 +390,8 @@ public class Registration {
 
         Builder builder = new Builder(configFile).serverAddress(serverAddress)
                 .serverInfo(serverInfo).blockDir(blockDir).servicePort(port)
-                .storedBlocks(storedBlocks).threadPoolSize(9)
+                .storedBlocks(storedBlocks).threadPoolOptions(
+                "core-pool-size=0;maximum-pool-size=15;keep-alive-time=30")
                 .ftpPort(2220 + code).keyPair(rsaKeyPair);
 
         JsonObject regMsg = Comm.newMessage("registration");

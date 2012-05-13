@@ -54,8 +54,8 @@ public class Negura {
         serverAddress = cm.getServerSocketAddress();
 
         requestHandler = new ClientRequestHandler(this, cm);
-        requestServer = new RequestServer(cm.getPort(), cm.getThreadPoolSize(),
-                requestHandler);
+        requestServer = new RequestServer(cm.getPort(),
+                cm.getThreadPoolOptions(), requestHandler);
         stateMaintainer = new StateMaintainer(cm);
         ftpServer = new NeguraFtpServer(cm);
     }

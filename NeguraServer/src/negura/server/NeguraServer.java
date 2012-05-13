@@ -16,13 +16,15 @@ public class NeguraServer {
         try {
             cm = new ServerConfigManager(configFile);
         } catch (IOException ex) {
-            NeguraLog.severe(ex, "Couldn't read config file.");
+            NeguraLog.severe(ex, "Couldn't read config file at '%s'.",
+                    configFile.getAbsolutePath());
         }
-        dataManager = new DataManager(cm);
 
+        dataManager = new DataManager(cm);
         announcer = new Announcer(dataManager);
         requestHandler = new ServerRequestHandler(cm, dataManager, announcer);
-        requestServer = new RequestServer(cm.getPort(), 10, requestHandler);
+        requestServer = new RequestServer(cm.getPort(),
+                cm.getThreadPoolOptions(), requestHandler);
     }
 
     public void run() {
@@ -40,6 +42,5 @@ public class NeguraServer {
         requestServer.stop();
         announcer.stop();
         dataManager.shutdown();
-        System.out.println("4");System.out.flush();
     }
 }

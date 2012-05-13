@@ -6,6 +6,7 @@ import java.security.KeyPair;
 import java.security.interfaces.RSAPrivateKey;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import negura.common.RequestServer;
 import negura.common.gui.Swt;
 import negura.common.gui.Swt.ManyToOne;
 import negura.common.util.MsgBox;
@@ -53,7 +54,7 @@ public class ConfigMaker {
     private final Text minBlocksT;
     private final Text portT;
     private final Text checkInTimeT;
-    private final Text concurrencyT;
+    private final Text threadPoolT;
     private final Text databaseUrlT;
     private final Text databaseUserT;
     private final Text databasePasswordT;
@@ -124,8 +125,9 @@ public class ConfigMaker {
         checkInTimeT = Swt.newText(p1, "w max", "300");
         Swt.newLabel(p1, "wrap", "seconds");
 
-        Swt.newLabel(p1, null, "Concurrency options:");
-        concurrencyT = Swt.newText(p1, "w max, wrap 25px", "asdf");
+        Swt.newLabel(p1, null, "Thread pool options:");
+        threadPoolT = Swt.newText(p1, "span, w max, wrap 25px",
+                "core-pool-size=2;maximum-pool-size=20;keep-alive-time=30");
 
         Swt.newLabel(p1, null, "Database URL:");
         databaseUrlT = Swt.newText(p1, "span, w max",
@@ -253,12 +255,6 @@ public class ConfigMaker {
     }
 
     private void step2() {
-        stackLayout.topControl = p2;
-        shell.setDefaultButton(doneB);
-        shell.layout();
-    }
-
-    private void step3() {
         builder.serverInfo.name = serverNameT.getText();
         builder.serverInfo.blockSize =
                 optionsInt[blockSizeC.getSelectionIndex()];
@@ -268,11 +264,22 @@ public class ConfigMaker {
         builder.port = Integer.parseInt(portT.getText());
         builder.serverInfo.checkInTime =
                 Integer.parseInt(checkInTimeT.getText());
-        builder.concurrencyOptions = concurrencyT.getText(); //TODO: validate.
+        builder.threadPoolOptions = threadPoolT.getText();
         builder.databaseUrl = databaseUrlT.getText();
         builder.databaseUser = databaseUserT.getText();
         builder.databasePassword = databasePasswordT.getText();
 
+        if (RequestServer.fromOptions(builder.threadPoolOptions) == null) {
+            MsgBox.warning(shell, "The thread pool options are invalid.");
+            return;
+        }
+
+        stackLayout.topControl = p2;
+        shell.setDefaultButton(doneB);
+        shell.layout();
+    }
+
+    private void step3() {
         builder.serverInfo.publicKey =
                 Rsa.publicKeyFromString(publicKey1T.getText());
         builder.serverInfo.adminPublicKey =
@@ -283,22 +290,22 @@ public class ConfigMaker {
                 Rsa.privateKeyFromString(privateKey2T.getText());
 
         if (builder.serverInfo.publicKey == null) {
-            MsgBox.info(shell, "Public key is invalid.");
+            MsgBox.warning(shell, "Public key is invalid.");
             return;
         }
 
         if (builder.serverInfo.adminPublicKey == null) {
-            MsgBox.info(shell, "Admin public key is invalid.");
+            MsgBox.warning(shell, "Admin public key is invalid.");
             return;
         }
 
         if (privateKey1 == null) {
-            MsgBox.info(shell, "Private key is invalid.");
+            MsgBox.warning(shell, "Private key is invalid.");
             return;
         }
 
         if(privateKey2 == null) {
-            MsgBox.info(shell, "Admin private key is invalid.");
+            MsgBox.warning(shell, "Admin private key is invalid.");
             return;
         }
 
@@ -313,6 +320,9 @@ public class ConfigMaker {
             shell.dispose();
             return;
         }
+
+        shell.setVisible(false);
+        MsgBox.info(shell, "Configuration was written successfuly.");
 
         shell.dispose();
     }

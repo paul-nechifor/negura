@@ -17,7 +17,7 @@ public class ServerConfigManager {
         public ServerInfo serverInfo;
         public int virtualDiskBlocks;
         public int port;
-        public String concurrencyOptions;
+        public String threadPoolOptions;
         public String databaseUrl;
         public String databaseUser;
         public String databasePassword; // TODO: Change this.
@@ -54,7 +54,7 @@ public class ServerConfigManager {
     }
 
     public String getDatabasePassword() {
-        return builder.databaseUser;
+        return builder.databasePassword;
     }
 
     public int getPort() {
@@ -67,5 +67,9 @@ public class ServerConfigManager {
 
     public ServerInfo getServerInfo() {
         return builder.serverInfo;
+    }
+
+    public String getThreadPoolOptions() {
+        return builder.threadPoolOptions;
     }
 }

@@ -25,6 +25,10 @@ public class MsgBox {
         return message(shell, null, message, SWT.ICON_INFORMATION | SWT.OK);
     }
 
+    public static int warning(Shell shell, String message) {
+        return message(shell, null, message, SWT.ICON_WARNING | SWT.OK);
+    }
+
     public static int error(Shell shell, String message) {
         return message(shell, null, message, SWT.ICON_ERROR | SWT.OK);
     }
