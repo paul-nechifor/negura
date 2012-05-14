@@ -22,7 +22,7 @@ import org.eclipse.swt.widgets.Shell;
  */
 public class LogWindow {
     private Shell shell;
-    private ClientConfigManager cm;
+    private ClientConfigManager cm; // Shut up Netbeans. It is actually used.
     private WindowLogHandler windowLogHandler;
 
     private static class WindowLogHandler extends Handler {
@@ -36,8 +36,10 @@ public class LogWindow {
         public void publish(final LogRecord record) {
             Display.getDefault().syncExec(new Runnable() {
                 public void run() {
-                    if (!styledText.isDisposed())
+                    if (!styledText.isDisposed()) {
                         styledText.append(NeguraLog.FORMATTER.format(record));
+                        styledText.setCaretOffset(styledText.getCharCount());
+                    }
                 }
             });
         }
@@ -85,9 +87,9 @@ public class LogWindow {
             for (int read = in.read(buffer); read >= 0; read = in.read(buffer))
                 styledText.append(new String(buffer, 0, read));
         } catch (FileNotFoundException ex) {
-            NeguraLog.warning("Log file couldn't be found", ex);
+            NeguraLog.warning(ex, "Log file couldn't be found");
         } catch (IOException ex) {
-            NeguraLog.warning("Error reading log file.", ex);
+            NeguraLog.warning(ex, "Error reading log file.");
         }
 
         windowLogHandler = new WindowLogHandler(styledText);

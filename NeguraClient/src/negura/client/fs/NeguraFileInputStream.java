@@ -5,7 +5,6 @@ import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import negura.client.ClientConfigManager;
 import negura.common.util.Util;
@@ -66,10 +65,9 @@ public class NeguraFileInputStream extends InputStream {
             return (int) (size - position);
 
         int leftInBlock = blockSize - (int)(position % blockSize);
-        if (leftInBlock == 0) {
-            System.out.println("Don't get here 1.");
-            System.exit(1);
-        }
+        if (leftInBlock == 0)
+            throw new AssertionError("Cannot happen.");
+
         return leftInBlock;
     }
 

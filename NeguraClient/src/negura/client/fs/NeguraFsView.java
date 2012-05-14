@@ -5,6 +5,7 @@ import java.util.Collections;
 import java.util.List;
 import negura.client.ClientConfigManager;
 import negura.common.data.Operation;
+import negura.common.util.NeguraLog;
 
 /**
  * Manages the Negura file system. Receives the operations done on the file
@@ -91,6 +92,7 @@ public class NeguraFsView {
      * @param op   The operation.
      */
     private void processAddOperation(Operation op) {
+        NeguraLog.info("Added to file system: '%s'.", op.path);
         NeguraFile currDir = root;
         NeguraFile nextDir;
         String pathSoFar = "";
@@ -128,8 +130,6 @@ public class NeguraFsView {
      * @return               The array of components.
      */
     private String[] componentsOfPath(String absolutePath) {
-        System.out.println(">>>>" + absolutePath + "<<<<");
-
         ArrayList<String> comp = new ArrayList<String>();
         for (String c : absolutePath.replaceAll("/+", "/").split("/"))
             if (c.equals(".")) {

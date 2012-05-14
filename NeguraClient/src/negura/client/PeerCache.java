@@ -11,16 +11,14 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import negura.common.util.Comm;
+import negura.common.util.NeguraLog;
 
 /**
  * Caches the information about which peers have certain blocks.
  * @author Paul Nechifor
  */
 public class PeerCache {
-    private static final Logger LOGGER = Logger.getLogger("Negura");
     private ClientConfigManager cm;
     private HashMap<Integer, PeerList> blocks
             = new HashMap<Integer, PeerList>();
@@ -40,7 +38,7 @@ public class PeerCache {
         try {
             resp = Comm.readMessage(cm.getServerSocketAddress(), mesg);
         } catch (Exception ex) {
-            LOGGER.log(Level.WARNING, "Server isn't responding.", ex);
+            NeguraLog.warning(ex, "Server isn't responding.");
             return;
         }
 
@@ -85,8 +83,7 @@ public class PeerCache {
             preemptivelyCache(Arrays.asList(id));
 
         if (!blocks.containsKey(id)) {
-            LOGGER.log(Level.WARNING, "Couldn't get peers for block " + id +
-                    ".");
+            NeguraLog.warning("Couldn't get peers for block %d.", id);
             return null;
         }
 

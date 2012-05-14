@@ -55,9 +55,8 @@ public class BlockCache {
             throw new IOException("No peers to download block from.");
         }
         for (InetSocketAddress address : peers) {
-            NeguraLog.info("Address: " + address);
             int read = Comm.readBlock(buffer, 0, -1, blockId, address);
-            System.out.println("Read " + read + "  from block  " + blockId);
+            NeguraLog.info("Read %d from block %d.", read, blockId);
             if (read > 0) {
                 // Got the block.
                 bd = new BlockData(buffer, read);

@@ -54,7 +54,7 @@ public class TrayGui extends Service {
         }
         load();
 
-        openLogWindow();
+        //openLogWindow();
     }
 
     private MenuItem n(Menu menu, int type, String name, Image icon) {

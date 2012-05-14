@@ -35,7 +35,7 @@ public class DataManager {
         try {
             Class.forName("org.postgresql.Driver");
         } catch (ClassNotFoundException ex) {
-            NeguraLog.severe("PostgreSQL JDBC Driver not found.", ex);
+            NeguraLog.severe(ex, "PostgreSQL JDBC Driver not found.");
         }
 
         connectionPool = new BasicDataSource();
@@ -73,14 +73,14 @@ public class DataManager {
             Statement s = c.createStatement();
 
             for (int i = 0; i < commands.length - 1; i++) {
-                String command = commands[i].replaceAll("\\s+", " ").trim() + ";";
-                if (command.equals(";")) {
+                String command = commands[i].replaceAll("\\s+", " ").trim();
+                if (command.equals(";"))
                     continue;
-                }
+                
                 try {
                     s.execute(command);
                 } catch (SQLException ex) {
-                    NeguraLog.severe("Couldn't execute: '"+ command + "'.", ex);
+                    NeguraLog.severe(ex, "Couldn't execute '%s'.", command);
                 }
             }
 
@@ -278,7 +278,7 @@ public class DataManager {
         }
 
         if (ret.isEmpty()) {
-            System.out.println(query);
+            NeguraLog.warning("Bad problem. Fix this.");
             ret = peersForBlocks(blocks);
         }
 

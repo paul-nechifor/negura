@@ -4,8 +4,6 @@ import java.io.File;
 import java.io.IOException;
 import java.security.KeyPair;
 import java.security.interfaces.RSAPrivateKey;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import negura.common.RequestServer;
 import negura.common.gui.Swt;
 import negura.common.gui.Swt.ManyToOne;

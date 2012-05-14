@@ -1,6 +1,5 @@
 package negura.common.util;
 
-import com.google.gson.Gson;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.BufferedReader;
@@ -35,8 +34,6 @@ public class Comm {
     public static final int BLOCK_INVALID_LENGTH = 4;
 
     private Comm() { }
-
-    // TODO: Properly dispose of the pool on shutdown.
 
     public static void init(String protocol, String software) {
         Comm.protocol = protocol;

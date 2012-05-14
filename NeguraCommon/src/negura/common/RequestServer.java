@@ -21,7 +21,6 @@ public class RequestServer extends Service {
     private RequestHandler handler;
     private ThreadPoolExecutor exec;
     private ServerSocket serverSocket;
-    private Socket socket;
 
     public RequestServer(int port, String threadPoolOptions,
             RequestHandler handler) {
@@ -81,12 +80,15 @@ public class RequestServer extends Service {
             serverSocket.setReuseAddress(true);
             serverSocket.bind(new InetSocketAddress(port), 5);
         } catch (IOException ex) {
-            NeguraLog.severe("Could not open the server.", ex);
+            NeguraLog.severe(ex, "Could not open the server.");
         }
+
+        Socket toClose = null;
 
         while (running) {
             try {
-                socket = serverSocket.accept();
+                final Socket socket = serverSocket.accept();
+                toClose = socket;
                 exec.execute(new Runnable() {
                     @Override
                     public void run() {
@@ -94,13 +96,13 @@ public class RequestServer extends Service {
                     }
                 });
             } catch (RejectedExecutionException ex) {
-                try { socket.close(); } catch (Exception ex2) { }
+                try { toClose.close(); } catch (Exception ex2) { }
                 NeguraLog.warning(ex, "I had to reject request.");
             } catch (IOException ex) {
                 // This test is necesary because the socket will be forcefully
                 // closed when the program closes.
                 if (running)
-                    NeguraLog.severe("Accept failed", ex);
+                    NeguraLog.severe(ex, "Accept failed");
             }
         }
         
