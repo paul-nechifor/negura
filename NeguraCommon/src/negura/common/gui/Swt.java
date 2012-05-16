@@ -29,14 +29,21 @@ import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.Widget;
 
 /**
- *
+ * SWT static utility methods.
  * @author Paul Nechifor
  */
 public class Swt {
+    /**
+     * An interface for supplying the action which should be executed for the
+     * {@link Swt#connectTo(Mod, Widget, Widget...) connectTo} method.
+     */
     public static interface Mod {
         public void modify(Widget to, Widget... from);
     }
 
+    /**
+     * Updates the text when the slider is changed.
+     */
     public static final Mod TEXT_FROM_SLIDER = new Mod() {
         @Override
         public void modify(Widget to, Widget... from) {
@@ -55,6 +62,9 @@ public class Swt {
         }
     };
 
+    /**
+     * Updates the slider selection when the text changes.
+     */
     public static final Mod SLIDER_FROM_TEXT = new Mod() {
         @Override
         public void modify(Widget to, Widget... from) {
@@ -165,6 +175,14 @@ public class Swt {
         return ret;
     }
 
+    /**
+     * When any of the widgets in the <code>froms</code> parameter are updated
+     * the <code>to</code> parameter is modified according the action specified
+     * by <code>mod</code>.
+     * @param mod       The action which modifies <code>to</code>.
+     * @param to        The widget which will be modified.
+     * @param froms     The widgets which will generate the change events.
+     */
     public static void connectTo(final Mod mod, final Widget to,
             final Widget... froms) {
         ModifyListener ml = new ModifyListener() {
@@ -205,18 +223,19 @@ public class Swt {
     }
 
     /**
-     * Returns a monospaced font for this system or null on failure.
-     * @param display
-     * @param size
-     * @return
+     * Returns a monospaced font for this system or <code>null</code> on
+     * failure.
+     * @param display       The display.
+     * @param height        The height of the font.
+     * @return              A monospaced font which is available on this system.
      */
-    public static Font getMonospacedFont(Display display, int size) {
+    public static Font getMonospacedFont(Display display, int height) {
         String[] fontList = {"DejaVu Sans Mono", "Monospace",
             "Courier New", "Mono"};
 
         for (String fontName : fontList) {
             try {
-                Font font = new Font(display, fontName, size, SWT.NONE);
+                Font font = new Font(display, fontName, height, SWT.NONE);
                 return font;
             } catch (SWTError ex) { }
         }

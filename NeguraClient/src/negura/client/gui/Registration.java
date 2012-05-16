@@ -85,7 +85,6 @@ public class Registration {
                 I18n.get("continue"));
 
         // Page one options.
-
         titleFont = Swt.getFontWithDifferentHeight(display,
                 newConnectionL.getFont(), 16);
         Swt.connectDisposal(shell, titleFont);
@@ -302,21 +301,6 @@ public class Registration {
         registeredSuccessfully = true;
         shell.dispose();
     }
-    /*
-    private void updateUsedBlocks(int n, boolean fromSlider) {
-        if (fromSlider)
-            blocksToStoreT.setText(Integer.toString(n));
-        else {
-            if (n > blocksToStoreS.getMaximum())
-                blocksToStoreS.setSelection(blocksToStoreS.getMaximum());
-            else
-                blocksToStoreS.setSelection(n);
-        }
-        int inMiB = (blockSize * n) / (1024 * 1024);
-        spaceToBeUsedValL.setText(inMiB + " MiB");
-    }*/
-
-
 
     // Returns the location of the configuration file or null on failure.
     public static File testRegister(int code, String serverIp, int serverPort) {
