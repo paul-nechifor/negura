@@ -86,8 +86,12 @@ public class Negura {
                 Thread.sleep(6000);
             } catch (InterruptedException ex) { }
 
-            JsonObject mesg = Comm.newMessage("trigger-fs-update");
-            Comm.readMessage(serverAddress, mesg);
+            try {
+                JsonObject mesg = Comm.newMessage("trigger-fs-update");
+                Comm.readMessage(serverAddress, mesg);
+            } catch (IOException ex) {
+                NeguraLog.severe(ex);
+            }
         }
 
 //        if (cm.getPort() == 20000) {

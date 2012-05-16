@@ -17,24 +17,23 @@ import negura.common.json.Json;
 import negura.common.util.Comm;
 import negura.common.util.MsgBox;
 import negura.common.util.NeguraLog;
+import negura.common.util.Os;
 import negura.common.util.Rsa;
 import negura.common.util.Util;
 import net.miginfocom.swt.MigLayout;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StackLayout;
-import org.eclipse.swt.events.ModifyEvent;
-import org.eclipse.swt.events.ModifyListener;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
+import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
-import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Label;
-import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Slider;
 import org.eclipse.swt.widgets.Text;
+import org.eclipse.swt.widgets.Widget;
 
 /**
  * Manages the registration progess.
@@ -45,8 +44,9 @@ public class Registration {
     private Display display;
     private final Shell shell;
     private final StackLayout stackLayout;
-    private final Composite page1;
-    private final Composite page2;
+    private final Font titleFont;
+    private final Composite p1;
+    private final Composite p2;
     private final Text addressT;
     private final Label serverNameValL;
     private final Label blockSizeValL;
@@ -58,7 +58,6 @@ public class Registration {
     private final Button doneB;
     private InetSocketAddress serverAddress;
     private ServerInfo serverInfo;
-    private int blockSize = -1;
     private int minBlocks;
     private boolean registeredSuccessfully = false;
 
@@ -70,86 +69,81 @@ public class Registration {
         stackLayout = new StackLayout();
         shell.setLayout(stackLayout);
 
-        Swt.getMonospaceFont(display, 12);
+        Swt.getMonospacedFont(display, 12);
 
         // Page one positioning.
-        page1 = new Composite(shell, SWT.NONE);
-        page1.setLayout(new MigLayout("insets 10","[grow]"));
-        Label newConnectionL = Swt.n(Label.class, page1, SWT.LEFT,
-                "wrap 30px");
-        Label addressL = Swt.n(Label.class, page1, SWT.LEFT, "wrap");
-        addressT = Swt.n(Text.class, page1, SWT.BORDER,
-                "wrap push, w 200!");
-        Button continueB = Swt.n(Button.class, page1, SWT.PUSH,
-                "wrap, align right");
+        p1 = new Composite(shell, SWT.NONE);
+        p1.setLayout(new MigLayout("insets 10","[grow]"));
+
+        Label newConnectionL = Swt.newLabel(p1, "wrap 30px",
+                I18n.get("newConnection"));
+
+        Swt.newLabel(p1, "wrap", I18n.get("serverAddress"));
+        addressT = Swt.newText(p1, "wrap push, w 200!", "127.0.0.1:5000");
+
+        Button continueB = Swt.newButton(p1, "wrap, align right",
+                I18n.get("continue"));
 
         // Page one options.
-        newConnectionL.setText(I18n.get("newConnection"));
-        Swt.changeControlFontSize(newConnectionL, display, 16);
-        addressL.setText(I18n.get("serverAddress"));
-        continueB.setText(I18n.get("continue"));
+
+        titleFont = Swt.getFontWithDifferentHeight(display,
+                newConnectionL.getFont(), 16);
+        Swt.connectDisposal(shell, titleFont);
+        newConnectionL.setFont(titleFont);
+
         continueB.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
                 stepTwo();
             }
         });
-        addressT.setText("127.0.0.1:5000"); // TODO delete this.
 
         // Page two positioning.
-        page2 = new Composite(shell, SWT.NONE);
-        page2.setLayout(new MigLayout("insets 10","[right][150!][max]"));
-        Label settingsL = Swt.n(Label.class, page2, SWT.LEFT,
-                "span, align left, wrap 30px");
-        Label serverNameL = Swt.n(Label.class, page2, SWT.LEFT, null);
-        serverNameValL = Swt.n(Label.class, page2, SWT.LEFT, "w max, wrap");
-        Label blockSizeL = Swt.n(Label.class, page2, SWT.LEFT, null);
-        blockSizeValL = Swt.n(Label.class, page2, SWT.LEFT, "w max, wrap");
-        Label minBlocksL = Swt.n(Label.class, page2, SWT.LEFT, null);
-        minBlocksValL = Swt.n(Label.class, page2, SWT.LEFT,
-                "w max, wrap 30px");
-        Label blocksToStoreL = Swt.n(Label.class, page2, SWT.LEFT, null);
-        blocksToStoreT = Swt.n(Text.class, page2, SWT.BORDER, "w max");
-        blocksToStoreS = Swt.n(Slider.class, page2, SWT.HORIZONTAL,
-                "w max, wrap");
-        Label spaceToBeUsedL = Swt.n(Label.class, page2, SWT.LEFT, null);
-        spaceToBeUsedValL = Swt.n(Label.class, page2, SWT.LEFT,
-                "w max, wrap");
-        Label ftpPortL = Swt.n(Label.class, page2, SWT.LEFT, null);
-        ftpPortT = Swt.n(Text.class, page2, SWT.BORDER, "w max, wrap push");
-        doneB = Swt.n(Button.class, page2, SWT.PUSH,
-                "span, align right");
+        p2 = new Composite(shell, SWT.NONE);
+        p2.setLayout(new MigLayout("insets 10","[right][150!][max]"));
+
+        Label settingsL = Swt.newLabel(p2, "span, align left, wrap 30px",
+                I18n.get("settings"));
+
+        Swt.newLabel(p2, null, I18n.get("serverName"));
+        serverNameValL = Swt.newLabel(p2, "w max, wrap", null);
+
+        Swt.newLabel(p2, null, I18n.get("blockSize"));
+        blockSizeValL = Swt.newLabel(p2, "w max, wrap", null);
+
+        Swt.newLabel(p2, null, I18n.get("minimumBlocks"));
+        minBlocksValL = Swt.newLabel(p2, "w max, wrap 30px", null);
+
+        Swt.newLabel(p2, null, I18n.get("blocksToStore"));
+
+        blocksToStoreT = Swt.newText(p2, "w max", null);
+        blocksToStoreS = Swt.newHSlider(p2, "w max, wrap", -1, -1, -1);
+
+        Swt.newLabel(p2, null, I18n.get("usedSpace"));
+        spaceToBeUsedValL = Swt.newLabel(p2, "w max, wrap", null);
+
+        Swt.newLabel(p2, null, I18n.get("ftpPort"));
+        ftpPortT = Swt.newText(p2, "w max, wrap push", "43210");
+
+        doneB = Swt.newButton(p2, "span, align right", I18n.get("done"));
 
         // Page two options.
-        settingsL.setText(I18n.get("settings"));
-        Swt.changeControlFontSize(settingsL, display, 16);
-        serverNameL.setText(I18n.get("serverName"));
-        blockSizeL.setText(I18n.get("blockSize"));
-        minBlocksL.setText(I18n.get("minimumBlocks"));
-        blocksToStoreL.setText(I18n.get("blocksToStore"));
+        settingsL.setFont(titleFont);
         blocksToStoreT.addVerifyListener(Swt.INTEGER_VERIFIER);
-        blocksToStoreT.addModifyListener(new ModifyListener() {
-            @Override
-            public void modifyText(ModifyEvent me) {
-                int n = 0;
-                try {
-                    n = Integer.parseInt(blocksToStoreT.getText());
-                } catch (NumberFormatException ex) { }
-                updateUsedBlocks(n, false);
+        Swt.connectTo(Swt.TEXT_FROM_SLIDER, blocksToStoreT, blocksToStoreS);
+        Swt.connectTo(Swt.SLIDER_FROM_TEXT, blocksToStoreS, blocksToStoreT);
+        Swt.Mod mod = new Swt.Mod() {
+            public void modify(Widget to, Widget... from) {
+                Label label = (Label) to;
+                Text text = (Text) from[0];
+                long numberOfBlocks = Util.parseLongOrZero(text.getText());
+                label.setText(Util.bytesWithUnit(numberOfBlocks *
+                        serverInfo.blockSize, 2));
             }
-        });
-        blocksToStoreS.addListener(SWT.Selection, new Listener() {
-            @Override
-            public void handleEvent(Event e) {
-                int value = blocksToStoreS.getSelection();
-                updateUsedBlocks(value, true);
-            }
-        });
-        spaceToBeUsedL.setText(I18n.get("usedSpace"));
-        ftpPortL.setText(I18n.get("ftpPort"));
+        };
+        Swt.connectTo(mod, spaceToBeUsedValL, blocksToStoreT);
+        
         ftpPortT.addVerifyListener(Swt.INTEGER_VERIFIER);
-        ftpPortT.setText("43210");
-        doneB.setText(I18n.get("done"));
         doneB.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -157,7 +151,7 @@ public class Registration {
             }
         });
 
-        stackLayout.topControl = page1;
+        stackLayout.topControl = p1;
         shell.layout();
         shell.setDefaultButton(continueB);
     }
@@ -197,16 +191,16 @@ public class Registration {
         minBlocks = serverInfo.minimumBlocks;
         int defaultBlocks = minBlocks * 2;
 
+        blocksToStoreS.setMaximum(minBlocks * 10);
+        blocksToStoreS.setMinimum(minBlocks);
+        blocksToStoreS.setIncrement(8);
         serverNameValL.setText(serverInfo.name);
-        blockSizeValL.setText((serverInfo.blockSize / 1024) + " KiB");
+        blockSizeValL.setText(Util.bytesWithUnit(
+                serverInfo.blockSize, 0));
         minBlocksValL.setText(Integer.toString(minBlocks));
         blocksToStoreT.setText(Integer.toString(defaultBlocks));
-        blocksToStoreS.setMinimum(minBlocks);
-        blocksToStoreS.setMaximum(minBlocks * 10);
-        blocksToStoreS.setIncrement(8);
-        updateUsedBlocks(defaultBlocks, false);
 
-        stackLayout.topControl = page2;
+        stackLayout.topControl = p2;
         shell.setDefaultButton(doneB);
         shell.layout();
     }
@@ -234,9 +228,9 @@ public class Registration {
         }
 
         // Creating the directories if they need to be created.
-        File blockDir = new File(new File(Util.getUserDataDir(), 
+        File blockDir = new File(new File(Os.getUserDataDir(),
                 Main.SHORT_NAME), "blocks");
-        File configFileDir = new File(Util.getUserConfigDir(),
+        File configFileDir = new File(Os.getUserConfigDir(),
                 Main.SHORT_NAME);
         if (!blockDir.exists() && !blockDir.mkdirs()) {
             MsgBox.error(shell, I18n.format("failedBlockDir",
@@ -308,21 +302,7 @@ public class Registration {
         registeredSuccessfully = true;
         shell.dispose();
     }
-
     /*
-    private void message(String message) {
-        message(message, SWT.ICON_WARNING);
-    }
-
-    private void message(String message, int type) {
-        MessageBox messageBox = new MessageBox(shell, type | SWT.OK);
-        messageBox.setText("");
-        messageBox.setMessage(message);
-        int buttonID = messageBox.open();
-    }
-     *
-     */
-
     private void updateUsedBlocks(int n, boolean fromSlider) {
         if (fromSlider)
             blocksToStoreT.setText(Integer.toString(n));
@@ -334,7 +314,7 @@ public class Registration {
         }
         int inMiB = (blockSize * n) / (1024 * 1024);
         spaceToBeUsedValL.setText(inMiB + " MiB");
-    }
+    }*/
 
 
 
@@ -347,7 +327,7 @@ public class Registration {
                 strCode);
         String path = dir.getAbsolutePath();
         if (dir.exists()) {
-            if (!Util.removeDirectory(dir)) {
+            if (!Os.removeDirectory(dir)) {
                 NeguraLog.severe("Failed to delete dir: %s", dir);
             }
         }

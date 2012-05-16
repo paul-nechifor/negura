@@ -6,7 +6,6 @@ import java.security.KeyPair;
 import java.security.interfaces.RSAPrivateKey;
 import negura.common.RequestServer;
 import negura.common.gui.Swt;
-import negura.common.gui.Swt.ManyToOne;
 import negura.common.util.MsgBox;
 import negura.common.util.Rsa;
 import negura.common.util.Util;
@@ -21,12 +20,12 @@ import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
-import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.Slider;
 import org.eclipse.swt.widgets.Text;
+import org.eclipse.swt.widgets.Widget;
 
 /**
  *
@@ -44,6 +43,7 @@ public class ConfigMaker {
     private final Shell shell;
     private final StackLayout stackLayout;
     private final Font monospacedFont;
+    private final Font titleFont;
     private final Composite p1;
     private final Composite p2;
     private final Text serverNameT;
@@ -67,7 +67,7 @@ public class ConfigMaker {
         // Initializing the block size options.
         for (int i = 0; i < BLOCK_OPTIONS; i++) {
             optionsInt[i] = (int) Math.pow(2, i) * SMALLEST_BLOCK;
-            optionsStr[i] = String.format("%d KiB", optionsInt[i] / 1024);
+            optionsStr[i] = Util.bytesWithUnit(optionsInt[i], 0);
         }
 
         // Initializing the key size options.
@@ -85,8 +85,8 @@ public class ConfigMaker {
         stackLayout = new StackLayout();
         shell.setLayout(stackLayout);
 
-        monospacedFont = Swt.getMonospaceFont(display, 9);
-        Swt.connectDispose(shell, monospacedFont);
+        monospacedFont = Swt.getMonospacedFont(display, 9);
+        Swt.connectDisposal(shell, monospacedFont);
 
         // Page one positioning. ///////////////////////////////////////////////
         p1 = new Composite(shell, SWT.NONE);
@@ -102,7 +102,7 @@ public class ConfigMaker {
 
         Swt.newLabel(p1, null, "Virtual disk blocks:");
         diskBlocksT = Swt.newText(p1, "w max", null);
-        Slider diskBlocksS = Swt.newSlider(p1, "w max, wrap",
+        Slider diskBlocksS = Swt.newHSlider(p1, "w max, wrap",
                 128, 1024, 64);
 
         Swt.newLabel(p1, null, "Virtual disk space:");
@@ -110,7 +110,7 @@ public class ConfigMaker {
 
         Swt.newLabel(p1, null, "Minimum user blocks:");
         minBlocksT = Swt.newText(p1, "w max", null);
-        Slider minBlocksS = Swt.newSlider(p1, "w max, wrap",
+        Slider minBlocksS = Swt.newHSlider(p1, "w max, wrap",
                 128, 1024, 64);
 
         Swt.newLabel(p1, null, "Minimum user space:");
@@ -141,28 +141,32 @@ public class ConfigMaker {
         Button continueB = Swt.newButton(p1, "span, align right", "Continue");
 
         // Page one options. ///////////////////////////////////////////////////
-        Swt.changeControlFontSize(newConfigL, display, 16);
+        titleFont = Swt.getFontWithDifferentHeight(display,
+                newConfigL.getFont(), 16);
+        Swt.connectDisposal(shell, titleFont);
+        newConfigL.setFont(titleFont);
+
+        Swt.Mod tripleConnector = new Swt.Mod() {
+            public void modify(Widget to, Widget... from) {
+                Label label = (Label) to;
+                Combo combo = (Combo) from[0];
+                Text text = (Text) from[1];
+                int blockSize = optionsInt[combo.getSelectionIndex()];
+                long numberOfBlocks = Util.parseLongOrZero(text.getText());
+                label.setText(Util.bytesWithUnit(numberOfBlocks * blockSize,2));
+            }
+        };
 
         diskBlocksT.addVerifyListener(Swt.INTEGER_VERIFIER);
-        Swt.connect(diskBlocksT, diskBlocksS);
-        Swt.tripleConnect(diskSpaceL, blockSizeC, diskBlocksT, new ManyToOne() {
-            public void connect(Label one, Control[] many) {
-                long bSize = optionsInt[((Combo)many[0]).getSelectionIndex()];
-                int blockNo = Integer.parseInt(((Text)many[1]).getText());
-                one.setText(Util.bytesWithUnit(bSize * blockNo));
-            }
-        });
+        Swt.connectTo(Swt.TEXT_FROM_SLIDER, diskBlocksT, diskBlocksS);
+        Swt.connectTo(Swt.SLIDER_FROM_TEXT, diskBlocksS, diskBlocksT);
+        Swt.connectTo(tripleConnector, diskSpaceL, blockSizeC, diskBlocksT);
         diskBlocksT.setText("768");
         
         minBlocksT.addVerifyListener(Swt.INTEGER_VERIFIER);
-        Swt.connect(minBlocksT, minBlocksS);
-        Swt.tripleConnect(minSpaceL, blockSizeC, minBlocksT, new ManyToOne() {
-            public void connect(Label one, Control[] many) {
-                long bSize = optionsInt[((Combo)many[0]).getSelectionIndex()];
-                int blockNo = Integer.parseInt(((Text)many[1]).getText());
-                one.setText(Util.bytesWithUnit(bSize * blockNo));
-            }
-        });
+        Swt.connectTo(Swt.TEXT_FROM_SLIDER, minBlocksT, minBlocksS);
+        Swt.connectTo(Swt.SLIDER_FROM_TEXT, minBlocksS, minBlocksT);
+        Swt.connectTo(tripleConnector, minSpaceL, blockSizeC, minBlocksT);
         minBlocksT.setText("350");
 
         portT.addVerifyListener(Swt.INTEGER_VERIFIER);
@@ -204,7 +208,7 @@ public class ConfigMaker {
         doneB = Swt.newButton(p2, "span, align right", "Done");
 
         // Page two options. ///////////////////////////////////////////////////
-        Swt.changeControlFontSize(newConfig2L, display, 16);
+        newConfig2L.setFont(titleFont);
         publicKey1T.setFont(monospacedFont);
         privateKey1T.setFont(monospacedFont);
         publicKey2T.setFont(monospacedFont);

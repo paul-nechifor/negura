@@ -9,7 +9,7 @@ import negura.client.Main;
 import negura.client.Negura;
 import negura.client.ftp.NeguraFtpServer;
 import negura.common.Service;
-import negura.common.util.Util;
+import negura.common.util.Os;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Display;
@@ -125,9 +125,9 @@ public class TrayGui extends Service {
         });
         selfDestructMi.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
-                Util.removeDirectory(new File(Util.getUserConfigDir(),
+                Os.removeDirectory(new File(Os.getUserConfigDir(),
                         Main.SHORT_NAME));
-                Util.removeDirectory(new File(Util.getUserDataDir(),
+                Os.removeDirectory(new File(Os.getUserDataDir(),
                         Main.SHORT_NAME));
                 negura.shutdown();
             }

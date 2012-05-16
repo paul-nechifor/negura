@@ -1,5 +1,7 @@
 package negura.common.gui;
 
+import java.security.InvalidParameterException;
+import negura.common.util.Util;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.SWTError;
 import org.eclipse.swt.events.DisposeEvent;
@@ -31,16 +33,55 @@ import org.eclipse.swt.widgets.Widget;
  * @author Paul Nechifor
  */
 public class Swt {
-    public static interface ManyToOne {
-        public void connect(Label one, Control[] many);
+    public static interface Mod {
+        public void modify(Widget to, Widget... from);
+    }
+
+    public static final Mod TEXT_FROM_SLIDER = new Mod() {
+        @Override
+        public void modify(Widget to, Widget... from) {
+            if (from.length != 1 || !(from[0] instanceof Slider))
+                throw new InvalidParameterException("from isn't Slider");
+            if (!(to instanceof Text))
+                throw new InvalidParameterException("to isn't Text");
+
+            Slider slider = (Slider) from[0];
+            Text text = (Text) to;
+            int sliderValue = slider.getSelection();
+            long textValue = Util.parseLongOrZero(text.getText());
+
+            if (textValue != sliderValue)
+                text.setText(Integer.toString(sliderValue));
+        }
     };
 
+    public static final Mod SLIDER_FROM_TEXT = new Mod() {
+        @Override
+        public void modify(Widget to, Widget... from) {
+            if (from.length != 1 || !(from[0] instanceof Text))
+                throw new InvalidParameterException("from isn't Text");
+            if (!(to instanceof Slider))
+                throw new InvalidParameterException("to isn't Slider");
+
+            Slider slider = (Slider) to;
+            Text text = (Text) from[0];
+            int sliderValue = slider.getSelection();
+            int textValue = Util.parseIntOrZero(text.getText());
+
+            if (textValue != sliderValue)
+                slider.setSelection(textValue);
+        }
+    };
+
+    /**
+     * A verifier which permits only integer numbers of unlimited size.
+     */
     public static final VerifyListener INTEGER_VERIFIER =
             new VerifyListener() {
         @Override
         public void verifyText(final VerifyEvent event) {
             switch (event.keyCode) {
-                case 0:                // To allow setText()
+                case 0:                // To allow setText() TODO: debug this.
                 case SWT.BS:           // Backspace
                 case SWT.DEL:          // Delete
                 case SWT.HOME:         // Home
@@ -56,29 +97,7 @@ public class Swt {
 
     private Swt() { }
 
-    /**
-     * Changes the font size of a control.
-     * @param control
-     * @param display
-     * @param newSize
-     */
-    public static void changeControlFontSize(Control control, Display display,
-            int newSize) {
-        FontData[] fontData = control.getFont().getFontData();
-        for (int i = 0; i < fontData.length; ++i)
-            fontData[i].setHeight(newSize);
-        final Font newFont = new Font(display, fontData);
-        control.setFont(newFont);
-
-        // Since you created the font, you must dispose it
-        control.addDisposeListener(new DisposeListener() {
-            public void widgetDisposed(DisposeEvent e) {
-                newFont.dispose();
-            }
-        });
-    }
-
-    public static <T extends Control> T n(Class<T> type, Composite c, int i,
+    private static <T extends Control> T n(Class<T> type, Composite c, int i,
             String layoutData) {
         try {
             T t = type.getDeclaredConstructor(Composite.class, int.class)
@@ -135,57 +154,48 @@ public class Swt {
         return ret;
     }
 
-    public static Slider newSlider(Composite c, String layout, int min,
+    public static Slider newHSlider(Composite c, String layout, int min,
             int max, int increment) {
         Slider ret = n(Slider.class, c, SWT.HORIZONTAL, layout);
-        ret.setMinimum(min);
+        // The maximum has to be set first because setting the minimum checks to
+        // see that it isn't greater than the maximum.
         ret.setMaximum(max);
+        ret.setMinimum(min);
         ret.setIncrement(increment);
         return ret;
     }
 
-    public static void connect(final Text text, final Slider slider) {
-        text.addModifyListener(new ModifyListener() {
+    public static void connectTo(final Mod mod, final Widget to,
+            final Widget... froms) {
+        ModifyListener ml = new ModifyListener() {
             @Override
             public void modifyText(ModifyEvent me) {
-                long textValue = 0;
-                try {
-                    textValue = Long.parseLong(text.getText());
-                } catch (NumberFormatException ex) { }
-                if (textValue > slider.getMaximum())
-                    textValue = slider.getMaximum();
-                if (slider.getSelection() != textValue)
-                    slider.setSelection((int) textValue);
-            }
-        });
-
-        slider.addListener(SWT.Selection, new Listener() {
-            @Override
-            public void handleEvent(Event e) {
-                int sliderValue = slider.getSelection();
-                int textValue = 0;
-                try {
-                    textValue = Integer.parseInt(text.getText());
-                } catch (NumberFormatException ex) { }
-                if (textValue != sliderValue)
-                    text.setText(Integer.toString(sliderValue));
-            }
-        });
-    }
-
-    public static void tripleConnect(final Label label, final Combo a,
-            final Text b, final ManyToOne mod) {
-        ModifyListener m = new ModifyListener() {
-            @Override
-            public void modifyText(ModifyEvent me) {
-                mod.connect(label, new Control[]{ a, b });
+                mod.modify(to, froms);
             }
         };
 
-        a.addModifyListener(m);
-        b.addModifyListener(m);
+        Listener l = new Listener() {
+            @Override
+            public void handleEvent(Event event) {
+                mod.modify(to, froms);
+            }
+        };
+
+        for (Widget from : froms) {
+            if (from instanceof Text) {
+                ((Text) from).addModifyListener(ml);
+            } else if (from instanceof Combo) {
+                ((Combo) from).addModifyListener(ml);
+            } else if (from instanceof Slider) {
+                ((Slider) from).addListener(SWT.Selection, l);
+            } else throw new AssertionError("Not supported... yet.");
+        }
     }
 
+    /**
+     * Centers the shell on the middle of the screen.
+     * @param shell     The shell to be centered.
+     */
     public static void centerShell(Shell shell) {
         Rectangle bds = shell.getDisplay().getBounds();
         Point p = shell.getSize();
@@ -194,7 +204,13 @@ public class Swt {
         shell.setBounds(nLeft, nTop, p.x, p.y);
     }
 
-    public static Font getMonospaceFont(Display display, int size) {
+    /**
+     * Returns a monospaced font for this system or null on failure.
+     * @param display
+     * @param size
+     * @return
+     */
+    public static Font getMonospacedFont(Display display, int size) {
         String[] fontList = {"DejaVu Sans Mono", "Monospace",
             "Courier New", "Mono"};
 
@@ -207,7 +223,28 @@ public class Swt {
         return null;
     }
 
-    public static void connectDispose(Widget onDisposal,
+    /**
+     * Returns the same font with a different height. You have to dispose of it.
+     * @param display       The display.
+     * @param font          The original font.
+     * @param newHeight     The new height for the font.
+     * @return              The modified font.
+     */
+    public static Font getFontWithDifferentHeight(Display display, Font font,
+            int newHeight) {
+        FontData[] fontData = font.getFontData();
+        for (int i = 0; i < fontData.length; ++i)
+            fontData[i].setHeight(newHeight);
+        return new Font(display, fontData);
+    }
+
+    /**
+     * Listens for the disposal of <code>onDisposal</code> and disposes the
+     * resource <code>toDispose</code> when that happens.
+     * @param onDisposal    The widget to listen on.
+     * @param toDispose     The Resource to dispose.
+     */
+    public static void connectDisposal(Widget onDisposal,
             final Resource toDispose) {
         onDisposal.addDisposeListener(new DisposeListener() {
             @Override

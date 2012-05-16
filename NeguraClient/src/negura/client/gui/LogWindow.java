@@ -12,6 +12,7 @@ import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.events.ShellEvent;
 import org.eclipse.swt.events.ShellListener;
+import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
@@ -24,6 +25,7 @@ public class LogWindow {
     private Shell shell;
     private ClientConfigManager cm; // Shut up Netbeans. It is actually used.
     private WindowLogHandler windowLogHandler;
+    private final Font smallFont;
 
     private static class WindowLogHandler extends Handler {
         private StyledText styledText;
@@ -57,10 +59,13 @@ public class LogWindow {
         shell.setText("Log");
         shell.setSize(455, 368);
         shell.setLayout(new FillLayout());
+        smallFont = Swt.getMonospacedFont(display, 8);
+        Swt.connectDisposal(shell, smallFont);
+
         StyledText styledText = new StyledText(shell, SWT.BORDER |
                 SWT.V_SCROLL | SWT.MULTI | SWT.WRAP);
         styledText.setEditable(false);
-        Swt.changeControlFontSize(styledText, display, 8);
+        styledText.setFont(smallFont);
         
         shell.addShellListener(new ShellListener() {
             public void shellClosed(ShellEvent se) {
@@ -68,6 +73,7 @@ public class LogWindow {
                 if (windowLogHandler != null)
                     NeguraLog.removeHandler(windowLogHandler);
                 shell.dispose();
+                // Setting to null for isClosed() method.
                 shell = null;
             }
 

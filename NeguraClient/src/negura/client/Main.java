@@ -3,7 +3,7 @@ package negura.client;
 import java.io.File;
 import negura.client.gui.Registration;
 import negura.common.util.Comm;
-import negura.common.util.Util;
+import negura.common.util.Os;
 import org.apache.ftpserver.ftplet.FtpException;
 
 //Icon from http://www.komodomedia.com/.
@@ -25,7 +25,7 @@ public class Main {
         // If there are no arguments, start with the default configuration file
         // or start the registration.
         if (args.length == 0) {
-            configFile = new File(new File(Util.getUserConfigDir(),
+            configFile = new File(new File(Os.getUserConfigDir(),
                     SHORT_NAME), "config.json");
             if (!configFile.exists()) {
                 Registration r = new Registration();

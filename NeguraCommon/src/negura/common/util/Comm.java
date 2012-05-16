@@ -39,13 +39,16 @@ public class Comm {
         Comm.protocol = protocol;
         Comm.software = software;
         try {
-            ADDRESS = Util.getFirstNetworkAddress();
+            ADDRESS = Os.getFirstNetworkAddress();
         } catch (Exception ex) {
             NeguraLog.severe(ex);
         }
     }
 
-    // Returns a JSON object which already contains the required fields.
+    /**
+     * Returns a JSON object with the required fields.
+     * @return              The JSON message.
+     */
     public static JsonObject newMessage() {
         JsonObject ret = new JsonObject();
         ret.addProperty("protocol", protocol);
@@ -53,7 +56,11 @@ public class Comm {
         return ret;
     }
 
-    // Returns an empty JSON request.
+    /**
+     * Returns an empty JSON request.
+     * @param request       The type of the request.
+     * @return              The JSON message.
+     */
     public static JsonObject newMessage(String request) {
         JsonObject ret = newMessage();
         ret.addProperty("request", request);
@@ -68,15 +75,13 @@ public class Comm {
     }
 
     public static JsonObject readMessage(InetSocketAddress address,
-            JsonObject message)  {
+            JsonObject message) throws IOException  {
         JsonObject ret = null;
         Socket socket = new Socket();
         try {
             socket.bind(new InetSocketAddress(ADDRESS, 0));
             socket.connect(address);
             ret = readMessage(socket, message);
-        } catch (Exception ex) {
-            NeguraLog.severe(ex);
         } finally {
             Comm.closeSocket(socket);
         }
@@ -84,11 +89,15 @@ public class Comm {
     }
 
     public static JsonObject readMessage(String ipAddress, int port,
-            JsonObject message) {
+            JsonObject message) throws IOException {
         return readMessage(new InetSocketAddress(ipAddress, port), message);
     }
 
-    // Read the JSON message from the socket, but don't close it.
+    /**
+     * Reads a JSON message from the socket without closing it.
+     * @param socket    Where to read from.
+     * @return          The JSON message which was read.
+     */
     public static JsonObject readMessage(Socket socket) {
         try {
             BufferedReader reader = new BufferedReader(

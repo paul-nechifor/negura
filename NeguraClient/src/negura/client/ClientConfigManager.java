@@ -13,12 +13,12 @@ import java.util.List;
 import java.util.logging.FileHandler;
 import javax.xml.bind.DatatypeConverter;
 import negura.common.data.BlockIndexer;
-import negura.common.util.Util;
 import negura.common.data.Operation;
 import negura.common.data.RsaKeyPair;
 import negura.common.data.ServerInfo;
 import negura.common.json.Json;
 import negura.common.util.NeguraLog;
+import negura.common.util.Os;
 
 /**
  * Controls the configuration. Some properties change over time and some don't.
@@ -172,9 +172,14 @@ public class ClientConfigManager {
     }
 
     public synchronized String saveBlock(int id, byte[] block, int size) {
-        File bDir = builder.blockDir;
-        String storeCode = Util.randomFileName(bDir, null, BLOCK_EXTENSION);
-        File blockFile = new File(bDir, storeCode + BLOCK_EXTENSION);
+        File blockFile = null;
+        try {
+            blockFile = Os.randomFile(builder.blockDir, null, BLOCK_EXTENSION);
+        } catch (IOException ex) {
+            NeguraLog.severe(ex, "Failed to create block file.");
+        }
+        String code = blockFile.getName();
+        code = code.substring(0, code.length() - BLOCK_EXTENSION.length());
 
         // Getting the hash for this block.
         blockHash.update(block, 0, size);
@@ -191,8 +196,8 @@ public class ClientConfigManager {
 
         builder.blockIndex.hashToId.put(hash, id);
         builder.blockIndex.idToHash.put(id, hash);
-        builder.blockIndex.idToStoreCode.put(id, storeCode);
-        builder.blockIndex.storeCodeToId.put(storeCode, id);
+        builder.blockIndex.idToStoreCode.put(id, code);
+        builder.blockIndex.storeCodeToId.put(code, id);
 
         downloadQueue.remove(new Integer(id));
 
