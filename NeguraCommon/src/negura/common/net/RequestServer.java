@@ -86,7 +86,7 @@ public class RequestServer extends Service {
 
         Socket toClose = null;
 
-        while (getContinueRunning()) {
+        while (continueRunning) {
             try {
                 final Socket socket = serverSocket.accept();
                 toClose = socket;
@@ -102,7 +102,7 @@ public class RequestServer extends Service {
             } catch (IOException ex) {
                 // This test is necesary because the socket will be forcefully
                 // closed when the program closes.
-                if (getContinueRunning())
+                if (continueRunning)
                     NeguraLog.severe(ex, "Accept failed");
             }
         }

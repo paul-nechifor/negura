@@ -31,7 +31,7 @@ public class Announcer extends Service {
     public void run() {
         thisThread = Thread.currentThread();
         long now;
-        while (getContinueRunning()) {
+        while (continueRunning) {
             announceNewBlocks();
             
             now = System.currentTimeMillis();

@@ -151,7 +151,7 @@ public class TrayGui extends Service {
     }
 
     public void run() {
-        while (!mainShell.isDisposed() && getContinueRunning()) {
+        while (!mainShell.isDisposed() && continueRunning) {
             if (!display.readAndDispatch()) {
                 display.sleep();
             }

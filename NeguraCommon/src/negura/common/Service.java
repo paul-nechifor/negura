@@ -6,7 +6,11 @@ package negura.common;
  * @author Paul Nechifor
  */
 public abstract class Service implements Runnable {
-    private boolean continueRunning = false;
+    /**
+     * When this is volatile variable is set to false, the service should try
+     * to stop as soon as possible.
+     */
+    protected volatile boolean continueRunning = false;
 
     /**
      * Starts the service int a new thread and returns.
@@ -41,14 +45,5 @@ public abstract class Service implements Runnable {
             throw new RuntimeException("The service wasn't started.");
 
         continueRunning = false;
-    }
-
-    /**
-     * Returns true if the thread will continue to run; if this is false it
-     * doesn't mean that it has stopped as it might not have had time.
-     * @return      If the thread will continue to run.
-     */
-    public synchronized boolean getContinueRunning() {
-        return continueRunning;
     }
 }

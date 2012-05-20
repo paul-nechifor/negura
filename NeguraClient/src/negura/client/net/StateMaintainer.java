@@ -48,7 +48,7 @@ public class StateMaintainer extends Service {
         Map<Integer, ArrayList<String>> peers;
         long now;
 
-        while (getContinueRunning()) {
+        while (continueRunning) {
             try {
                 Thread.sleep(1061);
             } catch (InterruptedException ex) { }
