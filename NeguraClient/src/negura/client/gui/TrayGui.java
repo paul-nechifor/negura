@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.Map;
 import negura.client.ClientConfigManager;
 import negura.client.I18n;
-import negura.client.Main;
 import negura.client.Negura;
 import negura.client.ftp.NeguraFtpServer;
 import negura.common.Service;
@@ -27,7 +26,7 @@ import org.eclipse.swt.widgets.TrayItem;
  */
 public class TrayGui extends Service {
     private static final String[] IMAGES = new String[] {
-        "trayicon", "/res/icons/trayicon_24.png",
+        "trayicon", "/res/icons/application_24.png",
         "exit", "/res/icons/exit_16.png"
     };
 
@@ -53,8 +52,6 @@ public class TrayGui extends Service {
             icons.put(IMAGES[i], img);
         }
         load();
-
-        //openLogWindow();
     }
 
     private MenuItem n(Menu menu, int type, String name, Image icon) {
@@ -79,7 +76,7 @@ public class TrayGui extends Service {
         final MenuItem startFtpMi = n(menu, SWT.CHECK, I18n.get("startFtp"), null);
         startFtpMi.setText(I18n.get("startFtp"));
         MenuItem refreshMi = n(menu, SWT.PUSH, I18n.get("refreshFileSystem"));
-        MenuItem viewLogMi = n(menu, SWT.PUSH, "Open log");
+        MenuItem viewLogMi = n(menu, SWT.PUSH, I18n.get("openLog"));
         n(menu, SWT.SEPARATOR, null);
         MenuItem exitMi = n(menu, SWT.PUSH, I18n.get("exit"),
                 icons.get("exit"));
@@ -100,11 +97,11 @@ public class TrayGui extends Service {
                 if (startFtpMi.getSelection()) {
                     NeguraFtpServer ftpServer =  negura.getFtpServer();
                     ftpServer.start();
-                    tip("Negura FTP",
-                            "Started on " + ftpServer.getOpenedOnPort());
+                    tip(I18n.get("applicationFtp"), I18n.format("startedOn",
+                            ftpServer.getOpenedOnPort()));
                 } else {
-                    negura.getFtpServer().stop();
-                    tip("Negura FTP", "The FTP server has been stoped.");
+                    negura.getFtpServer().requestStop();
+                    tip(I18n.get("applicationFtp"), I18n.get("stoppedFtp"));
                 }
             }
         });
@@ -120,16 +117,16 @@ public class TrayGui extends Service {
         });
         exitMi.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
-                negura.shutdown();
+                negura.shutdown(true);
             }
         });
         selfDestructMi.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
                 Os.removeDirectory(new File(Os.getUserConfigDir(),
-                        Main.SHORT_NAME));
+                        I18n.get("applicationShortName")));
                 Os.removeDirectory(new File(Os.getUserDataDir(),
-                        Main.SHORT_NAME));
-                negura.shutdown();
+                        I18n.get("applicationShortName")));
+                negura.shutdown(false);
             }
         });
     }
@@ -154,7 +151,7 @@ public class TrayGui extends Service {
     }
 
     public void run() {
-        while (!mainShell.isDisposed() && running) {
+        while (!mainShell.isDisposed() && getContinueRunning()) {
             if (!display.readAndDispatch()) {
                 display.sleep();
             }

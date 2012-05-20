@@ -6,6 +6,7 @@ import java.io.IOException;
 import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import negura.client.ClientConfigManager;
+import negura.client.I18n;
 import negura.common.gui.Swt;
 import negura.common.util.NeguraLog;
 import org.eclipse.swt.SWT;
@@ -13,6 +14,7 @@ import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.events.ShellEvent;
 import org.eclipse.swt.events.ShellListener;
 import org.eclipse.swt.graphics.Font;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
@@ -56,9 +58,13 @@ public class LogWindow {
         this.cm = cm;
 
         shell = new Shell(display);
-        shell.setText("Log");
+        shell.setText(I18n.get("log"));
         shell.setSize(455, 368);
         shell.setLayout(new FillLayout());
+        Image icon = new Image(display, getClass().getResourceAsStream(
+                "/res/icons/application_32.png"));
+        Swt.connectDisposal(shell, icon);
+        shell.setImage(icon);
         smallFont = Swt.getMonospacedFont(display, 8);
         Swt.connectDisposal(shell, smallFont);
 

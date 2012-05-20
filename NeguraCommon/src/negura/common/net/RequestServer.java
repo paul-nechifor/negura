@@ -1,4 +1,4 @@
-package negura.common;
+package negura.common.net;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -9,6 +9,7 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import negura.common.Service;
 import negura.common.util.NeguraLog;
 
 /**
@@ -85,7 +86,7 @@ public class RequestServer extends Service {
 
         Socket toClose = null;
 
-        while (running) {
+        while (getContinueRunning()) {
             try {
                 final Socket socket = serverSocket.accept();
                 toClose = socket;
@@ -101,7 +102,7 @@ public class RequestServer extends Service {
             } catch (IOException ex) {
                 // This test is necesary because the socket will be forcefully
                 // closed when the program closes.
-                if (running)
+                if (getContinueRunning())
                     NeguraLog.severe(ex, "Accept failed");
             }
         }
@@ -113,18 +114,23 @@ public class RequestServer extends Service {
         for (int i = 0; i < 1000; i++) {
             if (exec.isTerminated())
                 break;
-            tryToSleep(5);
+            
+            try {
+                Thread.sleep(5);
+            } catch (InterruptedException ex) { }
         }
         if (!exec.isTerminated())
             exec.shutdownNow();
     }
 
     @Override
-    public void stop() {
-        super.stop();
+    public void requestStop() {
+        super.requestStop();
         try {
             serverSocket.close();
-        } catch (Exception ex) {}
+        } catch (Exception ex) {
+            NeguraLog.warning(ex);
+        }
 
         // The shutdown of the thread pool is called after the end of this loop
         // and not by the thread who calls this method.

@@ -1,4 +1,4 @@
-package negura.server;
+package negura.server.net;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
@@ -10,6 +10,7 @@ import java.util.List;
 import negura.common.util.Comm;
 import negura.common.Service;
 import negura.common.util.NeguraLog;
+import negura.server.DataManager;
 
 /**
  * Announces the uses of the blocks they must download and of the filesystem
@@ -30,7 +31,7 @@ public class Announcer extends Service {
     public void run() {
         thisThread = Thread.currentThread();
         long now;
-        while (running) {
+        while (getContinueRunning()) {
             announceNewBlocks();
             
             now = System.currentTimeMillis();
@@ -38,13 +39,16 @@ public class Announcer extends Service {
                 announceNewOperation();
                 lastSentNewOps = System.currentTimeMillis();
             }
-            tryToSleep(200);
+
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException ex) { }
         }
     }
 
     @Override
-    public void stop() {
-        super.stop();
+    public void requestStop() {
+        super.requestStop();
         thisThread.interrupt();
     }
 
@@ -79,7 +83,9 @@ public class Announcer extends Service {
             InetSocketAddress address = dataManager.userAddress(userId);
             try {
                 Comm.readMessage(address, message);
-            } catch (Exception ex) { }
+            } catch (Exception ex) {
+                NeguraLog.warning(ex);
+            }
 
             // TODO:
             // The queue might get too big (unable to process as fast as they
@@ -114,7 +120,9 @@ public class Announcer extends Service {
         for (InetSocketAddress a : recentUsers) {
             try {
                 Comm.readMessage(a, send);
-            } catch (Exception ex) { }
+            } catch (Exception ex) {
+                NeguraLog.warning(ex);
+            }
         }
     }
 }

@@ -1,8 +1,10 @@
 package negura.server;
 
+import negura.server.net.ServerRequestHandler;
+import negura.server.net.Announcer;
 import java.io.File;
 import java.io.IOException;
-import negura.common.RequestServer;
+import negura.common.net.RequestServer;
 import negura.common.util.NeguraLog;
 
 public class NeguraServer {
@@ -28,6 +30,9 @@ public class NeguraServer {
     }
 
     public void run() {
+        if (cm.getFirstRun())
+            dataManager.createTables();
+
         announcer.startInNewThread();
         requestServer.startInNewThread();
 
@@ -39,8 +44,8 @@ public class NeguraServer {
     }
 
     public void shutdown() {
-        requestServer.stop();
-        announcer.stop();
+        requestServer.requestStop();
+        announcer.requestStop();
         dataManager.shutdown();
     }
 }

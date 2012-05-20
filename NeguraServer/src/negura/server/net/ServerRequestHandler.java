@@ -1,4 +1,4 @@
-package negura.server;
+package negura.server.net;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
@@ -14,10 +14,12 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import negura.common.util.Comm;
-import negura.common.RequestHandler;
+import negura.common.net.RequestHandler;
 import negura.common.data.Operation;
 import negura.common.json.Json;
 import negura.common.util.NeguraLog;
+import negura.server.DataManager;
+import negura.server.ServerConfigManager;
 
 public class ServerRequestHandler implements RequestHandler {
     private ServerConfigManager cm;
@@ -29,8 +31,6 @@ public class ServerRequestHandler implements RequestHandler {
         this.cm = cm;
         this.dataManager = dataManager;
         this.announcer = announcer;
-
-        this.dataManager.recreateTables();
     }
 
     public void handle(Socket socket) {
@@ -71,8 +71,11 @@ public class ServerRequestHandler implements RequestHandler {
         }
 
         if (!socket.isClosed()) {
-            try { socket.close(); }
-            catch (IOException ex) { }
+            try {
+                socket.close();
+            } catch (IOException ex) {
+                NeguraLog.warning(ex);
+            }
         }
     }
 

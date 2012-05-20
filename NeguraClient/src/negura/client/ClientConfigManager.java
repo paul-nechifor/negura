@@ -1,5 +1,7 @@
 package negura.client;
 
+import negura.client.net.BlockCache;
+import negura.client.net.PeerCache;
 import negura.client.fs.NeguraFsView;
 import java.io.File;
 import java.io.FileOutputStream;

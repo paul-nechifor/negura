@@ -1,4 +1,4 @@
-package negura.client;
+package negura.client.net;
 
 import negura.client.fs.NeguraFsView;
 import com.google.gson.JsonObject;
@@ -10,8 +10,10 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
+import negura.client.ClientConfigManager;
+import negura.client.Negura;
 import negura.common.util.Comm;
-import negura.common.RequestHandler;
+import negura.common.net.RequestHandler;
 import negura.common.util.NeguraLog;
 import negura.common.util.Util;
 
@@ -56,8 +58,11 @@ public class ClientRequestHandler implements RequestHandler {
         }
 
         if (!socket.isClosed()) {
-            try { socket.close(); }
-            catch (IOException ex) { }
+            try {
+                socket.close();
+            } catch (IOException ex) {
+                NeguraLog.warning(ex);
+            }
         }
     }
 

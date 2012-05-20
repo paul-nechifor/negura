@@ -1,6 +1,7 @@
 package negura.common.gui;
 
 import java.security.InvalidParameterException;
+import negura.common.util.NeguraLog;
 import negura.common.util.Util;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.SWTError;
@@ -237,7 +238,9 @@ public class Swt {
             try {
                 Font font = new Font(display, fontName, height, SWT.NONE);
                 return font;
-            } catch (SWTError ex) { }
+            } catch (SWTError ex) {
+                NeguraLog.warning(ex);
+            }
         }
         return null;
     }

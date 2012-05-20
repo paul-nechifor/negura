@@ -13,8 +13,6 @@ import org.apache.ftpserver.ftplet.FtpException;
  * @author Paul Nechifor
  */
 public class Main {
-    public static final String SHORT_NAME = "negura";
-
     private Main() { }
 
     public static void main(String[] args) throws FtpException {
@@ -26,7 +24,7 @@ public class Main {
         // or start the registration.
         if (args.length == 0) {
             configFile = new File(new File(Os.getUserConfigDir(),
-                    SHORT_NAME), "config.json");
+                    I18n.get("applicationShortName")), "config.json");
             if (!configFile.exists()) {
                 Registration r = new Registration();
                 r.loopUntilClosed();

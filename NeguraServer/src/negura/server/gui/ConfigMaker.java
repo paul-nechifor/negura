@@ -4,7 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import java.security.KeyPair;
 import java.security.interfaces.RSAPrivateKey;
-import negura.common.RequestServer;
+import negura.common.net.RequestServer;
 import negura.common.gui.Swt;
 import negura.common.util.MsgBox;
 import negura.common.util.Rsa;
@@ -270,6 +270,7 @@ public class ConfigMaker {
         builder.databaseUrl = databaseUrlT.getText();
         builder.databaseUser = databaseUserT.getText();
         builder.databasePassword = databasePasswordT.getText();
+        builder.firstRun = true;
 
         if (RequestServer.fromOptions(builder.threadPoolOptions) == null) {
             MsgBox.warning(shell, "The thread pool options are invalid.");

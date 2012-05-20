@@ -56,7 +56,7 @@ public class DataManager {
         }
     }
 
-    public void recreateTables() {
+    public void createTables() {
         NeguraLog.info("Creating the tables.");
 
         String commandsFile = null;

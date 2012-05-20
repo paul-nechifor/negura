@@ -1,4 +1,4 @@
-package negura.client;
+package negura.client.net;
 
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
+import negura.client.ClientConfigManager;
 import negura.common.util.Comm;
 import negura.common.util.NeguraLog;
 

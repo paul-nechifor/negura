@@ -26,6 +26,7 @@ import org.eclipse.swt.custom.StackLayout;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
 import org.eclipse.swt.graphics.Font;
+import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
@@ -64,10 +65,14 @@ public class Registration {
     public Registration() {
         display = new Display();
         shell = new Shell(display);
-        shell.setText("Negura");
+        shell.setText(I18n.get("applicationName"));
         shell.setSize(550, 400);
         stackLayout = new StackLayout();
         shell.setLayout(stackLayout);
+        Image icon = new Image(display, getClass().getResourceAsStream(
+                "/res/icons/application_32.png"));
+        Swt.connectDisposal(shell, icon);
+        shell.setImage(icon);
 
         Swt.getMonospacedFont(display, 12);
 
@@ -228,9 +233,9 @@ public class Registration {
 
         // Creating the directories if they need to be created.
         File blockDir = new File(new File(Os.getUserDataDir(),
-                Main.SHORT_NAME), "blocks");
+                I18n.get("applicationShortName")), "blocks");
         File configFileDir = new File(Os.getUserConfigDir(),
-                Main.SHORT_NAME);
+                I18n.get("applicationShortName"));
         if (!blockDir.exists() && !blockDir.mkdirs()) {
             MsgBox.error(shell, I18n.format("failedBlockDir",
                     blockDir.getAbsoluteFile()));

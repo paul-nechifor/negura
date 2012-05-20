@@ -1,4 +1,4 @@
-package negura.client;
+package negura.client.net;
 
 import negura.client.fs.NeguraFsView;
 import com.google.gson.JsonArray;
@@ -11,6 +11,7 @@ import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import negura.client.ClientConfigManager;
 import negura.common.util.Comm;
 import negura.common.Service;
 import negura.common.data.Operation;
@@ -47,8 +48,10 @@ public class StateMaintainer extends Service {
         Map<Integer, ArrayList<String>> peers;
         long now;
 
-        while (running) {
-            tryToSleep(1061);
+        while (getContinueRunning()) {
+            try {
+                Thread.sleep(1061);
+            } catch (InterruptedException ex) { }
             now = System.currentTimeMillis();
 
             if (now - lastUpdatedBlockList > updateBlockListEvery) {

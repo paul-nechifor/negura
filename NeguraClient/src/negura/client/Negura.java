@@ -15,6 +15,8 @@
 
 package negura.client;
 
+import negura.client.net.StateMaintainer;
+import negura.client.net.ClientRequestHandler;
 import negura.client.fs.NeguraFile;
 import negura.client.fs.NeguraFileInputStream;
 import com.google.gson.JsonArray;
@@ -32,7 +34,7 @@ import javax.xml.bind.DatatypeConverter;
 import negura.client.ftp.NeguraFtpServer;
 import negura.client.gui.TrayGui;
 import negura.common.util.Comm;
-import negura.common.RequestServer;
+import negura.common.net.RequestServer;
 import negura.common.util.NeguraLog;
 
 public class Negura {
@@ -93,30 +95,19 @@ public class Negura {
                 NeguraLog.severe(ex);
             }
         }
-
-//        if (cm.getPort() == 20000) {
-//            try {
-//                Thread.sleep(3000);
-//            } catch (InterruptedException ex) { }
-//            try {
-//                writeFile("/muzică/Yui - Again.mp3", new File("/home/p/o.mp3"));
-//            } catch (Exception ex) {
-//                ex.printStackTrace();
-//                System.exit(1);
-//            }
-//        }
     }
 
-    public void shutdown() {
-        requestServer.stop();
-        trayGui.stop();
+    public void shutdown(boolean complain) {
         try {
+            requestServer.requestStop();
+            trayGui.requestStop();
             cm.save();
-        } catch (IOException ex) {
-            NeguraLog.severe(ex);
+            if (ftpServer != null)
+                ftpServer.requestStop();
+        } catch (Exception ex) {
+            if (complain)
+                NeguraLog.severe(ex);
         }
-        if (ftpServer != null)
-            ftpServer.stop();
         // TODO: see why not all the threads are stopping. Is it the FTP server?
         System.exit(0);
     }

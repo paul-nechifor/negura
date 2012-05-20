@@ -66,8 +66,8 @@ public class NeguraFtpServer extends Service {
     }
 
     @Override
-    public void stop() {
-        super.stop();
+    public void requestStop() {
+        super.requestStop();
         if (ftpServer != null && !ftpServer.isStopped())
             ftpServer.stop();
     }

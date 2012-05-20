@@ -23,6 +23,7 @@ public class ServerConfigManager {
         public String databasePassword; // TODO: Change this.
         public RSAPrivateKey privateKey;
         public RSAPrivateKey adminPrivateKey;
+        public boolean firstRun;
 
         public Builder(File configFile) {
             this.configFile = configFile;
@@ -71,5 +72,13 @@ public class ServerConfigManager {
 
     public String getThreadPoolOptions() {
         return builder.threadPoolOptions;
+    }
+
+    public boolean getFirstRun() {
+        return builder.firstRun;
+    }
+
+    public void setFirstRun(boolean firstRun) {
+        builder.firstRun = firstRun;
     }
 }
