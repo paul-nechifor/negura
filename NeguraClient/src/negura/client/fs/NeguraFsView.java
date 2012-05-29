@@ -1,10 +1,10 @@
 package negura.client.fs;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 import negura.client.ClientConfigManager;
 import negura.common.data.Operation;
+import negura.common.ex.NeguraRunEx;
 import negura.common.util.NeguraLog;
 
 /**
@@ -42,15 +42,14 @@ public class NeguraFsView {
         return cm;
     }
 
-    // TODO: what if I'm beeing announced of more advanced operations. I should
-    // remember them and get the missing ones.
     public final synchronized void addOperations(List<Operation> newOps) {
         int expectedId = operations.size() + 1;
-        Collections.sort(newOps);
-        // Only adds the operation if it is the next one to follow.
+
         for (Operation o : newOps) {
-            if (o.id != expectedId)
-                break;
+            if (o.oid != expectedId) {
+                throw new NeguraRunEx("Expected %d, found %d.",
+                        expectedId, o.oid);
+            }
             operations.add(o);
             processOperation(o);
             expectedId++;
@@ -114,7 +113,7 @@ public class NeguraFsView {
         }
         name = components[components.length - 1];
         NeguraFile newFile = NeguraFile.newFile(this, pathSoFar, name, op.date,
-                op.size, op.id);
+                op.size, op.oid);
         currDir.subfiles.put(name, newFile);
     }
 

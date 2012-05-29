@@ -16,21 +16,27 @@ import java.util.List;
  * @author Paul Nechifor
  */
 public class Os {
+    public static enum FileType {FILE, DIR}
+
     private Os() { }
 
     /**
-     * Creates and returns a new empty file. If a suffix isn't supplied the file
-     * name will have no extension.
+     * Creates and returns a new empty file or empty directory.
      * @param dir       The directory in which the file should be stored.
+     * @param type      Should it be file or a directory?
      * @param prefix    A prefix for the file name. Can be null.
-     * @param suffix    A suffix for the file. Can be null.
-     * @return          The empty file created.
+     * @param suffix    A suffix for the file. Can be null. If a suffix isn't
+     *                  supplied the file name will have no extension.
+     * @return          The created empty file or empty directory or null on
+     *                  failure.
      * @throws IOException on failure to create the file.
      */
-    public static File randomFile(File dir, String prefix, String suffix)
-            throws IOException {
+    public static File createRandomFile(File dir, FileType type, String prefix,
+            String suffix) throws IOException {
         int len = 8;
-        while (true) {
+
+        File newFile = null;
+        do {
             char[] c = new char[len];
             for (int i = 0; i < len; i++)
                 c[i] = (char) ('A' + Math.random() * 26);
@@ -38,15 +44,28 @@ public class Os {
             String name = "";
             if (prefix != null)
                 name += prefix;
-
             name += new String(c);
             if (suffix != null)
                 name += suffix;
 
-            File newFile = new File(dir, name);
-            if (newFile.createNewFile())
-                return newFile;
+            newFile = new File(dir, name);
+        } while (newFile.exists());
+
+        switch (type) {
+            case FILE:
+                if (newFile.createNewFile())
+                    return newFile;
+                break;
+            case DIR:
+                if (newFile.mkdirs())
+                    return newFile;
+                break;
+            default:
+                throw new AssertionError();
         }
+
+        // Failed to create the file or directory.
+        return null;
     }
     
     /**

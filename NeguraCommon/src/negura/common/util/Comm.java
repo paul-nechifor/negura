@@ -110,7 +110,11 @@ public class Comm {
         return null;
     }
 
-    // Write a JSON message to a socket and shutdown the output.
+    /**
+     * Write a JSON message to a socket and shutdown the output.
+     * @param socket        The socket to which to write.
+     * @param message       The JSON message.
+     */
     public static void writeMessage(Socket socket, JsonObject message) {
         try {
             BufferedWriter writer = new BufferedWriter(

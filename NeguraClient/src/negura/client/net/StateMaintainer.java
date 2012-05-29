@@ -1,10 +1,11 @@
 package negura.client.net;
 
-import negura.client.fs.NeguraFsView;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -15,6 +16,7 @@ import negura.client.ClientConfigManager;
 import negura.common.util.Comm;
 import negura.common.Service;
 import negura.common.data.Operation;
+import negura.common.json.Json;
 import negura.common.util.NeguraLog;
 
 /**
@@ -24,10 +26,11 @@ import negura.common.util.NeguraLog;
  * @author Paul Nechifor
  */
 public class StateMaintainer extends Service {
-    private ClientConfigManager cm;
-    private byte[] buffer;
+    private final ClientConfigManager cm;
+    private final byte[] buffer;
+
     private ArrayList<Integer> completed = new ArrayList<Integer>();
-    private PeerCache peerCache;
+
     private long lastSent = System.currentTimeMillis();
     private int sendAt = 60 * 1000;
     private int updateBlockListEvery = 5 * 60 * 1000; // Every 5 minutes.
@@ -38,13 +41,12 @@ public class StateMaintainer extends Service {
 
     public StateMaintainer(ClientConfigManager cm) {
         this.cm = cm;
-        this.buffer = new byte[cm.getServerInfoBlockSize()];
+        this.buffer = new byte[cm.getBlockSize()];
         this.sendAt = 60 * 1000;
-        this.peerCache = cm.getPeerCache();
     }
 
     public void run() {
-        List<Integer> downloadQueue;
+        int[] downloadQueue;
         Map<Integer, ArrayList<String>> peers;
         long now;
 
@@ -81,20 +83,20 @@ public class StateMaintainer extends Service {
                 lastSent = System.currentTimeMillis();
             }
 
-            if (cm.isDownloadQueueEmpty())
+            if (cm.getBlockList().isDownloadQueueEmpty())
                 continue;
 
-            downloadQueue = cm.getDownloadQueue();
-            peerCache.preemptivelyCache(downloadQueue);
+            downloadQueue = cm.getBlockList().getDownloadQueue();
+            cm.getPeerCache().preemptivelyCache(downloadQueue);
 
             for (int id : downloadQueue)
-                tryToDownload(id, peerCache.getPeersForBlock(id));
+                tryToDownload(id, cm.getPeerCache().getPeersForBlock(id));
 
             // If I got to this point and the queue is now empty, it means that
             // I've just now finished downloading all the blocks that were
             // allocated to me so I'd best flush the completed blocks and not
             // wait.
-            if (cm.isDownloadQueueEmpty())
+            if (cm.getBlockList().isDownloadQueueEmpty())
                 sendCompletedBlocks();
         }
     }
@@ -107,50 +109,69 @@ public class StateMaintainer extends Service {
         lastUpdatedFileSystem = 0;
     }
 
-    private void tryToUpdateBlockList() throws UnknownHostException,
-            IOException {
-        // TODO: specify from where the new blocks should be listed.
+    private void tryToUpdateBlockList() throws IOException {
         JsonObject mesg = Comm.newMessage("get-block-list");
         mesg.addProperty("uid", cm.getUserId());
-        JsonObject resp = Comm.readMessage(cm.getServerSocketAddress(), mesg);
+        mesg.addProperty("after", cm.getBlockList().getLastOrderId());
+        JsonObject resp = Comm.readMessage(cm.getServerAddress(), mesg);
 
         List<Integer> blocks = new ArrayList<Integer>();
         for (JsonElement e : resp.getAsJsonArray("blocks")) {
             blocks.add(e.getAsInt());
         }
 
-        cm.pushBlocks(blocks, true);
+        cm.getBlockList().addModifications(blocks);
     }
 
     private void tryToUpdateFileSystem() throws UnknownHostException,
             IOException {
-        NeguraFsView fsView = cm.getFsView();
-        
         JsonObject mesg = Comm.newMessage("filesystem-state");
-        mesg.addProperty("after", fsView.getLastOperationId());
-        JsonObject resp = Comm.readMessage(cm.getServerSocketAddress(), mesg);
+        mesg.addProperty("after", cm.getFsView().getLastOperationId());
+        JsonObject resp = Comm.readMessage(cm.getServerAddress(), mesg);
 
         List<Operation> ops = new ArrayList<Operation>();
-        for (JsonElement e : resp.getAsJsonArray("operations"))
-            ops.add(Operation.fromJson(e.getAsJsonObject()));
+        for (JsonElement e : resp.getAsJsonArray("operations")) {
+            ops.add(Json.fromJsonObject(e.getAsJsonObject(), Operation.class));
+        }
 
-        fsView.addOperations(ops);
+        cm.getFsView().addOperations(ops);
     }
 
-    private void tryToDownload(int id, List<InetSocketAddress> peers) {
+    private void tryToDownload(int bid, List<InetSocketAddress> peers) {
         if (peers == null) {
-            NeguraLog.warning("No peers to download block %d from.", id);
+            NeguraLog.warning("No peers to download block %d from.", bid);
             return;
         }
 
         for (InetSocketAddress address : peers) {
-            int read = Comm.readBlock(buffer, 0, -1, id, address);
+            int read = Comm.readBlock(buffer, 0, -1, bid, address);
             if (read <= 0) // Couldn't get block.
                 continue;
 
-            cm.saveBlock(id, buffer, read);
-            completed.add(id);
+            if (!saveBlock(bid, buffer, read))
+                continue;
+
+            completed.add(bid);
+            cm.getBlockList().haveDownloadedBlock(bid);
+
+            // The block was downloaded so I can break out.
             break;
+        }
+    }
+
+    private boolean saveBlock(int bid, byte[] block, int size) {
+        File blockFile = cm.getBlockList().getFileToSaveBlockTo(bid);
+
+        // TODO: Check the hash for this block.
+
+        try {
+            FileOutputStream out = new FileOutputStream(blockFile);
+            out.write(block, 0, size);
+            out.close();
+            return true;
+        } catch (IOException ex) {
+            NeguraLog.warning(ex, "Couldn't write block.");
+            return false;
         }
     }
 
@@ -166,7 +187,7 @@ public class StateMaintainer extends Service {
         mesg.add("blocks", list);
 
         try {
-            Comm.readMessage(cm.getServerSocketAddress(), mesg);
+            Comm.readMessage(cm.getServerAddress(), mesg);
             NeguraLog.info("Sent downloaded blocks: " + completed);
             completed.clear();
         } catch (Exception ex) {

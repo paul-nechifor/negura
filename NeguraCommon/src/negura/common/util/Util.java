@@ -12,6 +12,8 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.net.InetSocketAddress;
+import java.util.Collection;
 
 /**
  * General purpose static utility methods.
@@ -135,5 +137,24 @@ public class Util {
         final PrintWriter printWriter = new PrintWriter(result);
         aThrowable.printStackTrace(printWriter);
         return result.toString();
+    }
+
+    // TODO: update this to IPv6
+    public static InetSocketAddress stringToSocketAddress(String address) {
+        String[] split = address.split(":");
+        int port = Integer.parseInt(split[1]);
+        return new InetSocketAddress(split[0], port);
+    }
+
+    public static final int[] toArray(Collection<Integer> collection) {
+        int[] ret = new int[collection.size()];
+        int k = 0;
+
+        for (int item : collection) {
+            ret[k] = item;
+            k++;
+        }
+        
+        return ret;
     }
 }

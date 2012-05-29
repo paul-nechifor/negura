@@ -1,5 +1,6 @@
 package negura.server;
 
+import java.sql.SQLException;
 import negura.server.net.ServerRequestHandler;
 import negura.server.net.Announcer;
 import java.io.File;
@@ -30,10 +31,18 @@ public class NeguraServer {
     }
 
     public void run() {
-        if (cm.getFirstRun())
-            dataManager.createTables();
+        // If this is the first run the database must be initalized.
+        if (cm.getFirstRun()) {
+            try {
+                dataManager.createTables();
+                dataManager.createOriginalBlocks(cm.getVirtualDiskBlocks());
+                cm.setFirstRun(false);
+            } catch (SQLException ex) {
+                NeguraLog.severe(ex);
+            }
+        }
 
-        announcer.startInNewThread();
+        announcer.start();
         requestServer.startInNewThread();
 
         try {
@@ -45,7 +54,7 @@ public class NeguraServer {
 
     public void shutdown() {
         requestServer.requestStop();
-        announcer.requestStop();
+        announcer.stop();
         dataManager.shutdown();
     }
 }

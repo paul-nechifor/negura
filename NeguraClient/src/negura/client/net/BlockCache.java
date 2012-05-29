@@ -16,7 +16,6 @@ import negura.common.util.NeguraLog;
  */
 public class BlockCache {
     class BlockData {
-
         byte[] data;
         long lastUsed;
 
@@ -45,7 +44,7 @@ public class BlockCache {
 
     // TODO: change how this function is called.
     public void load() {
-        this.buffer = new byte[cm.getServerInfoBlockSize()];
+        this.buffer = new byte[cm.getBlockSize()];
     }
 
     public InputStream getBlockInputStream(int blockId) throws IOException {
@@ -66,7 +65,7 @@ public class BlockCache {
         }
 
         if (bd == null) {
-            throw new IOException("Couldn't get the block.");
+            throw new IOException("Couldn't get block.");
         }
 
         return bd.getInputStream();

@@ -1,45 +1,39 @@
 package negura.client;
 
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import negura.client.net.BlockCache;
 import negura.client.net.PeerCache;
 import negura.client.fs.NeguraFsView;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
-import java.util.Iterator;
 import java.util.List;
 import java.util.logging.FileHandler;
-import javax.xml.bind.DatatypeConverter;
-import negura.common.data.BlockIndexer;
+import negura.common.data.BlockList;
 import negura.common.data.Operation;
 import negura.common.data.RsaKeyPair;
 import negura.common.data.ServerInfo;
 import negura.common.json.Json;
 import negura.common.util.NeguraLog;
-import negura.common.util.Os;
 
 /**
  * Controls the configuration. Some properties change over time and some don't.
  * For those that change, classes that need them should always use the accessors
  * to get the current values.
  * 
- * TODO: Add a HashSet for the blocks so I can check existance faster.
  * TODO: Use Reader-Writer locks and not synchronized methods.
+ * TODO: User annotations for mutability.
  * @author Paul Nechifor
  */
 public class ClientConfigManager {
-    private static final String BLOCK_EXTENSION = ".blk";
-
     public static class Builder {
         private transient File configFile;
 
         private InetSocketAddress serverAddress;
         private int storedBlocks;
-        private File blockDir;
+        private File dataDir;
         private int servicePort;
         private int ftpPort;
         private String threadPoolOptions;
@@ -49,8 +43,7 @@ public class ClientConfigManager {
         private File logFile;
         
         // These cannot be initialized by the builder.
-        private BlockIndexer blockIndex = new BlockIndexer();
-        private final ArrayList<Integer> blockList = new ArrayList<Integer>();
+        private BlockList blockList = new BlockList();
         private List<Operation> operations = new ArrayList<Operation>();
 
         public Builder(File configFile) {
@@ -67,8 +60,8 @@ public class ClientConfigManager {
             return this;
         }
 
-        public Builder blockDir(File blockDir) {
-            this.blockDir = blockDir;
+        public Builder dataDir(File dataDir) {
+            this.dataDir = dataDir;
             return this;
         }
 
@@ -107,257 +100,119 @@ public class ClientConfigManager {
             return this;
         }
 
-        public ClientConfigManager build() {
+        public ClientConfigManager build() throws IOException {
             if (logFile == null)
                 logFile = new File(configFile.getParent(), "log.txt");
             return new ClientConfigManager(this);
         }
     }
 
-    private Builder builder;
+    // Final objects.
+    private final Builder builder;
+    private final PeerCache peerCache;
+    private final BlockCache blockCache;
+    private final BlockList blockList;
+    private final NeguraFsView fsView;
 
-    private MessageDigest blockHash;
-    private PeerCache peerCache;
-    private BlockCache blockCache;
-    private FileHandler fileLogHandler;
-    private NeguraFsView fsView;
-    private final ArrayList<Integer> downloadQueue = new ArrayList<Integer>();
+    // Immutable fields.
+    private final InetSocketAddress serverAddress;
+    private final int storedBlocks;
+    private final File dataDir;
+    private final int servicePort;
+    private final int ftpPort;
+    private final String threadPoolOptions;
+    private final int userId;
+    private final int blockSize;
+    private final File logFile;
 
-    public ClientConfigManager(Builder builder) {
+    public ClientConfigManager(Builder builder) throws IOException {
+        // Loading the file log handler as early as possible to log errors.
+        FileHandler handler = new FileHandler(
+                builder.logFile.getAbsolutePath(), true);
+        handler.setFormatter(NeguraLog.FORMATTER);
+        NeguraLog.addHandler(handler);
+
+        // Initializing final objects.
         this.builder = builder;
-        initCommon();
+        this.peerCache = new PeerCache(this);
+        this.blockCache = new BlockCache(this);
+        this.blockList = builder.blockList;
+        this.fsView = new NeguraFsView(this, builder.operations);
+
+        // Initializing immutable fields.
+        this.serverAddress = builder.serverAddress;
+        this.storedBlocks = builder.storedBlocks;
+        this.dataDir = builder.dataDir;
+        this.servicePort = builder.servicePort;
+        this.ftpPort = builder.ftpPort;
+        this.threadPoolOptions = builder.threadPoolOptions;
+        this.userId = builder.userId;
+        this.blockSize = builder.serverInfo.blockSize;
+        this.logFile = builder.logFile;
+
+        // Special initialization operations.
+        this.blockCache.load();
+        this.builder.blockList.setDataDir(builder.dataDir);
     }
 
     public ClientConfigManager(File configFile) throws IOException {
-        this.builder = Json.fromFile(configFile, Builder.class);
+        this(Json.fromFile(configFile, Builder.class));
         this.builder.configFile = configFile;
-        initCommon();
     }
 
     public void save() throws IOException {
         Json.toFile(builder.configFile, builder);
     }
 
-    private void initCommon() {
-        loadFileHandler();
-
-        try {
-            blockHash = MessageDigest.getInstance("SHA-256");
-        } catch (NoSuchAlgorithmException ex) {
-            NeguraLog.severe(ex);
-        }
-
-        peerCache = new PeerCache(this);
-        blockCache = new BlockCache(this);
-        fsView = new NeguraFsView(this, builder.operations);
-
-        // The download queue will be made up of those blocks which are in the
-        // block list but haven't been downloaded.
-        for (Integer id : builder.blockList) {
-            if (!builder.blockIndex.idToHash.containsKey(id)) {
-                downloadQueue.add(id);
-            }
-        }
-
-        blockCache.load();
-    }
-
-    private void loadFileHandler() {
-        try {
-            fileLogHandler = new FileHandler(
-                    builder.logFile.getAbsolutePath(), true);
-            fileLogHandler.setFormatter(NeguraLog.FORMATTER);
-            NeguraLog.addHandler(fileLogHandler);
-        } catch (Exception ex) {
-            NeguraLog.severe(ex);
-        }
-    }
-
-    public synchronized String saveBlock(int id, byte[] block, int size) {
-        File blockFile = null;
-        try {
-            blockFile = Os.randomFile(builder.blockDir, null, BLOCK_EXTENSION);
-        } catch (IOException ex) {
-            NeguraLog.severe(ex, "Failed to create block file.");
-        }
-        String code = blockFile.getName();
-        code = code.substring(0, code.length() - BLOCK_EXTENSION.length());
-
-        // Getting the hash for this block.
-        blockHash.update(block, 0, size);
-        String hash = DatatypeConverter.printHexBinary(
-                blockHash.digest());
-
-        try {
-            FileOutputStream out = new FileOutputStream(blockFile);
-            out.write(block, 0, size);
-            out.close();
-        } catch (IOException ex) {
-            NeguraLog.severe(ex, "Couldn't write config file.");
-        }
-
-        builder.blockIndex.hashToId.put(hash, id);
-        builder.blockIndex.idToHash.put(id, hash);
-        builder.blockIndex.idToStoreCode.put(id, code);
-        builder.blockIndex.storeCodeToId.put(code, id);
-
-        downloadQueue.remove(new Integer(id));
-
-        return hash;
-    }
-
-    public synchronized void pushOperations(List<Operation> operations) {
-        fsView.addOperations(operations);
-    }
-
-    public synchronized void pushBlocks(List<Integer> newBlocks,
-            boolean addForDownload) {
-        // Eliminate the blocks that already are in the list.
-        Iterator<Integer> iter = newBlocks.iterator();
-        while (iter.hasNext()) {
-            if (builder.blockList.contains(iter.next().intValue())) {
-                iter.remove();
-            }
-        }
-
-        if (newBlocks.isEmpty()) {
-            return;
-        }
-
-        // If the number of new blocks exceeds the number of stored blocks
-        // remove from the left.
-        if (newBlocks.size() > builder.storedBlocks) {
-            int throwOut = newBlocks.size() - builder.storedBlocks;
-            for (int i = 0; i < throwOut; i++) {
-                newBlocks.remove(0); // TODO: use another data type.
-            }
-        }
-
-        int pushOut;
-        int maxToLeave = builder.storedBlocks - newBlocks.size();
-        if (builder.blockList.size() > maxToLeave) {
-            pushOut = builder.blockList.size() - maxToLeave;
-        } else {
-            pushOut = 0;
-        }
-
-        for (int i = 0; i < pushOut; i++) {
-            deleteBlock(builder.blockList.remove(0)); // TODO: use another data type.
-        }
-        for (Integer i : newBlocks) {
-            builder.blockList.add(i);
-        }
-
-        if (addForDownload) {
-            downloadQueue.addAll(newBlocks);
-        }
-    }
-
-    /**
-     * Gets file location for the saved block.
-     * @param id   The id of the block.
-     * @return     The file location, or <code>null</code> if the blocks doesn't
-     *             exist.
-     */
-    public synchronized File fileForBlockId(int id) {
-        if (builder.blockIndex.idToStoreCode.containsKey(id)) {
-            return new File(builder.blockDir,
-                    builder.blockIndex.idToStoreCode.get(id) + BLOCK_EXTENSION);
-        }
-        return null;
-    }
-
-    /**
-     * Removes all traces of the block, except from the blockList.
-     */
-    private synchronized void deleteBlock(int id) {
-        if (builder.blockIndex.idToHash.containsKey(id)) {
-            String hash = builder.blockIndex.idToHash.get(id);
-            String storeCode = builder.blockIndex.idToStoreCode.get(id);
-            File block = fileForBlockId(id);
-            if (block.delete() == false) {
-                throw new RuntimeException("Could not delete file " + block);
-            }
-            builder.blockIndex.hashToId.remove(hash);
-            builder.blockIndex.idToHash.remove(id);
-            builder.blockIndex.idToStoreCode.remove(id);
-            builder.blockIndex.storeCodeToId.remove(storeCode);
-        }
-    }
-
-    public synchronized boolean isDownloadQueueEmpty() {
-        return downloadQueue.isEmpty();
-    }
-
-    /**
-     * The idea is that you get the state of the download queue as a whole and
-     * try to download them; you might not be able to get them all and then you
-     * should call this method again because new ones might have been added in
-     * the mean time.
-     * @return 
-     */
-    @SuppressWarnings("unchecked")
-    public synchronized List<Integer> getDownloadQueue() {
-        return (List<Integer>) downloadQueue.clone();
-    }
-
-    public synchronized InetSocketAddress getServerSocketAddress() {
-        return builder.serverAddress;
-    }
-
-    public synchronized int getServerInfoBlockSize() {
-        return builder.serverInfo.blockSize;
-    }
-
-    public synchronized int getStoredBlocks() {
-        return builder.storedBlocks;
-    }
-
-    public synchronized File getBlockDir() {
-        return builder.blockDir;
-    }
-
-    public synchronized int getPort() {
-        return builder.servicePort;
-    }
-
-    public synchronized int getFtpPort() {
-        return builder.ftpPort;
-    }
-
-    public synchronized int getUserId() {
-        return builder.userId;
-    }
-
-    public synchronized String getThreadPoolOptions() {
-        return builder.threadPoolOptions;
-    }
-
-    public synchronized File getLogFile() {
-        return builder.logFile;
-    }
-
-    /**
-     * Gets the filesystem view (doesn't change).
-     * @return
-     */
-    public NeguraFsView getFsView() {
-        return fsView;
-    }
-
-    /**
-     * Gets the peer cache (doesn't change).
-     * @return
-     */
-    public PeerCache getPeerCache() {
+    public final PeerCache getPeerCache() {
         return peerCache;
     }
 
-    /**
-     * Gets the block cache (doesn't change).
-     * @return
-     */
-    public BlockCache getBlockCache() {
+    public final BlockCache getBlockCache() {
         return blockCache;
+    }
+
+    public final BlockList getBlockList() {
+        return blockList;
+    }
+
+    public final NeguraFsView getFsView() {
+        return fsView;
+    }
+
+    public final InetSocketAddress getServerAddress() {
+        return serverAddress;
+    }
+
+    public final int getStoredBlocks() {
+        return storedBlocks;
+    }
+
+    public final File getDataDir() {
+        return dataDir;
+    }
+
+    public final int getServicePort() {
+        return servicePort;
+    }
+
+    public final int getFtpPort() {
+        return ftpPort;
+    }
+
+    public final String getThreadPoolOptions() {
+        return threadPoolOptions;
+    }
+
+    public final int getUserId() {
+        return userId;
+    }
+
+    public final int getBlockSize() {
+        return blockSize;
+    }
+
+    public final File getLogFile() {
+        return logFile;
     }
 }

@@ -1,15 +1,19 @@
 package negura.server.net;
 
-import com.google.gson.JsonArray;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonPrimitive;
+import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.sql.SQLException;
-import java.util.LinkedList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
+import negura.common.Service2;
 import negura.common.util.Comm;
-import negura.common.Service;
 import negura.common.util.NeguraLog;
+import negura.common.util.Util;
 import negura.server.DataManager;
 
 /**
@@ -17,109 +21,107 @@ import negura.server.DataManager;
  * update.
  * @author Paul Nechifor
  */
-public class Announcer extends Service {
-    private DataManager dataManager;
-    private Thread thisThread;
-    private final LinkedList<Integer> queue = new LinkedList<Integer>();
-    final private LinkedList<Integer> opsQueue = new LinkedList<Integer>();
-    private long lastSentNewOps = System.currentTimeMillis();
+public class Announcer extends Service2 {
+    private final Runnable callAnnounceNewBlocks = new Runnable() {
+        public void run() {
+            announceNewBlocks();
+        }
+    };
+    private final Runnable callAnnounceNewOperations = new Runnable() {
+        public void run() {
+            announceNewOperations();
+        }
+    };
+
+    private final DataManager dataManager;
+    private final HashSet<Integer> allocatedUsers = new HashSet<Integer>();
+    private final ScheduledExecutorService scheduler
+            = Executors.newScheduledThreadPool(1);
+    private ScheduledFuture<?> blocksTask;
 
     public Announcer(DataManager dataManager) {
         this.dataManager = dataManager;
     }
 
-    public void run() {
-        thisThread = Thread.currentThread();
-        long now;
-        while (continueRunning) {
-            announceNewBlocks();
-            
-            now = System.currentTimeMillis();
-            if (now - lastSentNewOps > 5 * 60 * 1000) {
-                announceNewOperation();
-                lastSentNewOps = System.currentTimeMillis();
-            }
-
-            try {
-                Thread.sleep(200);
-            } catch (InterruptedException ex) { }
-        }
+    @Override
+    public void start() {
+        super.start();
+        blocksTask = scheduler.scheduleAtFixedRate(callAnnounceNewBlocks,
+                200, 200, TimeUnit.MILLISECONDS);
     }
 
     @Override
-    public void requestStop() {
-        super.requestStop();
-        thisThread.interrupt();
+    public void stop() {
+        super.stop();
+        blocksTask.cancel(false);
     }
 
-    public void addNewBlocks(List<Integer> userIds) {
-        synchronized (queue) {
-            queue.addAll(userIds);
+    /**
+     * Add users to which blocks have been allocated and need to be announced of
+     * this.
+     * @param userIds       The list of user ids.
+     */
+    public void addNewAllocatedUsers(List<Integer> userIds) {
+        synchronized (allocatedUsers) {
+            allocatedUsers.addAll(userIds);
         }
     }
 
-    public void addNewOperation(int opId) {
-        synchronized (opsQueue) {
-            opsQueue.add(opId);
-        }
+    /**
+     * Called to signal that the operations should be announced.
+     */
+    public void triggerSendNewOperations() {
+        // Thread safe.
+        scheduler.schedule(callAnnounceNewOperations, 0, TimeUnit.SECONDS);
     }
 
-    public void triggerSendNewOps() {
-        lastSentNewOps = 0;
-    }
-
-    // TODO: the fact that I access the DB everytime to get the address is wrong
+    @SuppressWarnings("unchecked")
     private void announceNewBlocks() {
-        // At each iteration in this outer loop I get one entry out. I do it
-        // like this so that I don't lock the queue during the whole while loop.
+        // Cloning it so I can process it without hogging the lock.
+        HashSet<Integer> userIds;
+        synchronized (allocatedUsers) {
+            if (allocatedUsers.isEmpty())
+                return;
+            userIds = (HashSet<Integer>) allocatedUsers.clone();
+        }
 
-        Integer userId;
-        JsonObject message = Comm.newMessage("block-announce");
-        while (!queue.isEmpty()) {
-            synchronized (queue) {
-                userId = queue.pop();
-            }
+        List<String> addresses = null;
+        try {
+            addresses = dataManager.getUserAddresses(userIds);
+        } catch (SQLException ex) {
+            NeguraLog.severe(ex);
+        }
 
-            InetSocketAddress address = dataManager.userAddress(userId);
+        if (addresses.size() != userIds.size()) {
+            NeguraLog.severe("How come not all were found?");
+        }
+
+        JsonObject mesg = Comm.newMessage("block-announce");
+
+        InetSocketAddress socketAddress;
+        for (String address : addresses) {
+            socketAddress = Util.stringToSocketAddress(address);
             try {
-                Comm.readMessage(address, message);
-            } catch (Exception ex) {
+                Comm.readMessage(socketAddress, mesg);
+            } catch (IOException ex) {
                 NeguraLog.warning(ex);
             }
-
-            // TODO:
-            // The queue might get too big (unable to process as fast as they
-            // are arriving in which care I should probably just trim it.
         }
     }
 
-    private void announceNewOperation() {
-        synchronized (opsQueue) {
-            if (opsQueue.isEmpty())
-                return;
-        }
-
+    private void announceNewOperations() {
         List<InetSocketAddress> recentUsers = null;
         try {
             recentUsers = dataManager.getRecentUserAddresses();
         } catch (SQLException ex) {
             NeguraLog.severe(ex);
         }
-        // Prepare the universal message.
-        JsonObject send = Comm.newMessage("filesystem-update");
-        JsonArray array = new JsonArray();
-        synchronized (opsQueue) {
-            if (opsQueue.isEmpty())
-                return;
-            for (Integer i : opsQueue)
-                array.add(new JsonPrimitive(i));
-            opsQueue.clear();
-        }
-        send.add("ids", array);
+
+        JsonObject mesg = Comm.newMessage("filesystem-update");
 
         for (InetSocketAddress a : recentUsers) {
             try {
-                Comm.readMessage(a, send);
+                Comm.readMessage(a, mesg);
             } catch (Exception ex) {
                 NeguraLog.warning(ex);
             }

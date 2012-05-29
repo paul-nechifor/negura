@@ -11,9 +11,10 @@ import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import negura.common.ex.NeguraEx;
 import negura.common.util.Util;
 import negura.common.data.Block;
 import negura.common.data.Operation;
@@ -25,12 +26,9 @@ import org.apache.commons.dbcp.BasicDataSource;
  * @author Paul Nechifor
  */
 public class DataManager {
-    private ServerConfigManager cm;
     private BasicDataSource connectionPool;
 
     public DataManager(ServerConfigManager cm) {
-        this.cm = cm;
-
         // Testing for driver existance.
         try {
             Class.forName("org.postgresql.Driver");
@@ -48,15 +46,22 @@ public class DataManager {
         connectionPool.setMaxIdle(2);
     }
 
+    /**
+     * Shuts down the connection to the database.
+     */
     public void shutdown() {
         try {
             connectionPool.close();
         } catch (SQLException ex) {
-            NeguraLog.severe(ex);
+            NeguraLog.warning(ex);
         }
     }
 
-    public void createTables() {
+    /**
+     * Creates the tables and other things.
+     * @throws SQLException
+     */
+    public void createTables() throws SQLException {
         NeguraLog.info("Creating the tables.");
 
         String commandsFile = null;
@@ -66,11 +71,18 @@ public class DataManager {
         } catch (IOException ex) {
             NeguraLog.severe(ex);
         }
+
+        // Remove the comments.
+        commandsFile = commandsFile.replaceAll("--.*\r?\n", "\n");
+
+        // Split into individual commands.
         String[] commands = commandsFile.split(";");
 
+        Connection c = null;
+        Statement s = null;
         try {
-            Connection c = connectionPool.getConnection();
-            Statement s = c.createStatement();
+            c = connectionPool.getConnection();
+            s = c.createStatement();
 
             for (int i = 0; i < commands.length - 1; i++) {
                 String command = commands[i].replaceAll("\\s+", " ").trim();
@@ -84,107 +96,450 @@ public class DataManager {
                 }
             }
 
-            s.close();
-            c.close();
-        } catch (SQLException ex) {
-            NeguraLog.severe(ex);
+            NeguraLog.info("Finished creating tables.");
+        } finally {
+            closeQuietly(s);
+            closeQuietly(c);
         }
     }
 
-    public boolean userExists(String ipAddress, int port) {
-        String sqlText = "SELECT '1' FROM users WHERE ip = ? AND port = ?";
+    public void initializeSettings(int virtualDiskSize) throws SQLException {
+        Connection c = null;
+        Statement s = null;
         try {
-            Connection c = connectionPool.getConnection();
-            PreparedStatement ps = c.prepareStatement(sqlText);
+            c = connectionPool.getConnection();
+
+            String size = Integer.toString(virtualDiskSize);
+
+            initializeValues(c,
+                    "virtual_disk_size", size,
+                    "free_blocks", size,
+                    "first_free_block", "1");
+        } finally {
+            closeQuietly(s);
+            closeQuietly(c);
+        }
+    }
+
+    /**
+     * Creates all the empty blocks of the original file system.
+     * @param length   The number of blocks.
+     * @throws SQLException
+     */
+    public void createOriginalBlocks(int length) throws SQLException {
+        Connection c = null;
+        PreparedStatement ps = null;
+
+        try {
+            c = connectionPool.getConnection();
+            int firstBlock = (int)(long)(Long)singleValueResult(c,
+                    "SELECT nextval('block_seq')");
+            if (firstBlock != 1) {
+                throw new RuntimeException("The sequence returns " + firstBlock
+                        + " instead of 1.");
+            }
+
+            ps = c.prepareStatement("INSERT INTO blocks VALUES (?)");
+
+            for (int i = 1; i <= length; i++) {
+                ps.setInt(1, i);
+                ps.addBatch();
+            }
+
+            ps.executeBatch();
+
+            // The next value will be length + 1.
+            returnsRows(c, "SELECT setval('block_seq', " + length + ", true)");
+
+            NeguraLog.info("The %d original blocks were created.", length);
+        } finally {
+            closeQuietly(ps);
+            closeQuietly(c);
+        }
+    }
+
+    /**
+     * Checks if a user exists.
+     * @param ipAddress     The IP address of the user.
+     * @param port          The port of the user.
+     * @return              True if the user exists.
+     * @throws SQLException
+     */
+    public boolean userExists(String ipAddress, int port) throws SQLException {
+        Connection c = null;
+        PreparedStatement ps = null;
+
+        try {
+            c = connectionPool.getConnection();
+            ps = c.prepareStatement("SELECT '1' FROM users " +
+                    "WHERE ip = ? AND port = ?");
             ps.setString(1, ipAddress);
             ps.setInt(2, port);
             ResultSet results = ps.executeQuery();
             boolean found = results.next();
             results.close();
-            ps.close();
-            c.close();
             return found;
-        } catch (Exception ex) {
-            NeguraLog.severe(ex);
+        } finally {
+            closeQuietly(ps);
+            closeQuietly(c);
         }
-
-        return false;
     }
 
-    public InetSocketAddress userAddress(int id) {
-        try {
-            Connection c = connectionPool.getConnection();
-            Statement s = c.createStatement();
-            ResultSet results = s.executeQuery("SELECT ip, port FROM users"
-                    + " WHERE id = " + id + "");
-            results.next();
-            InetSocketAddress ret = new InetSocketAddress(results.getString(1),
-                    results.getInt(2));
-            results.close();
-            s.close();
-            c.close();
-            return ret;
-        } catch (Exception ex) {
-            NeguraLog.severe(ex);
-        }
-
-        return null;
-    }
-
+    /**
+     * Create a new user, allocate the blocks and return the user ID.
+     * @param ipAddress         The IP address of the new user.
+     * @param port              The port of the new user.
+     * @param numberOfBlocks    The number of blocks the user will store.
+     * @param publicKey         The new user's public key in base64.
+     * @return                  The user ID.
+     * @throws SQLException 
+     */
     public int createNewUser(String ipAddress, int port, int numberOfBlocks,
             String publicKey) throws SQLException {
-        Connection c = connectionPool.getConnection();
+        Connection c = null;
+        PreparedStatement ps = null;
+        Statement s = null;
 
-        // Try to allocate as much as half of the number of blocks.
-        // TODO: Refine this. Maybe there should be a server setting saying what
-        // procentage should be allocated.
-        double ratio = 0.05;
-        int allocate = (int) Math.ceil(numberOfBlocks * ratio);
-        List<Integer> blockIds = new ArrayList<Integer>(numberOfBlocks);
+        try {
+            c = connectionPool.getConnection();
 
-        // Get as many as 'allocate' blocks in a random order.
-        Statement s = c.createStatement();
-        ResultSet results = s.executeQuery("SELECT id FROM blocks"
-                + " ORDER BY random()");
-        while (results.next()) {
-            blockIds.add(results.getInt(1));
-            if (blockIds.size() >= allocate)
-                break;
+            // Increment the user ID sequence.
+            int userId = (int)(long)(Long)singleValueResult(c,
+                    "SELECT nextval('user_seq')");
+            
+            ps = c.prepareStatement("INSERT INTO users " +
+                    "VALUES (?, ?, ?, ?, ?, ?)");
+            ps.setInt(1, userId);
+            ps.setString(2, ipAddress);
+            ps.setInt(3, port);
+            ps.setInt(4, numberOfBlocks);
+            ps.setString(5, publicKey);
+            ps.setInt(6, 1); // New index starts at 1.
+            ps.executeUpdate();
+            ps.close();
+            
+            s = c.createStatement();
+            String sqlText = String.format(
+                    "INSERT INTO allocated " +
+                        "SELECT %d, bid " +
+                        "FROM ( " +
+                            "SELECT bid, count(*) AS bcount " +
+                            "FROM blocks " +
+                            "GROUP BY bid " +
+                        ") c " +
+                        "ORDER BY bcount, random() " +
+                        "LIMIT %d ",
+                    userId, numberOfBlocks);
+            s.executeUpdate(sqlText);
+
+            return userId;
+        } finally {
+            // ps might will normally be closed twice. This is here for safaty.
+            closeQuietly(ps);
+            closeQuietly(s);
+            closeQuietly(c);
         }
-        results.close();
+    }
 
-        // Increment the user ID sequence.
-        int userId = singleRowResult(c, "SELECT nextval('userSeq');");
-        PreparedStatement ps = c.prepareStatement("INSERT INTO users "
-                + "VALUES (?, ?, ?, ?, ?, ?, ?)");
-        ps.setInt(1, userId);
-        ps.setString(2, ipAddress);
-        ps.setInt(3, port);
-        ps.setInt(4, numberOfBlocks);
-        ps.setString(5, publicKey);
-        // New block to be used. Index starts at 1.
-        ps.setInt(6, blockIds.size() + 1);
-        ps.setInt(7, blockIds.size()); // Number of blocks allocated.
-        ps.executeUpdate();
-        ps.close();
+    /**
+     * Inserts the operation and adds the filled blocks to the allocation list
+     * for each user.
+     * @param op                The added operation.
+     * @param creatorId         The user who added the operation and who has all the
+     *                          blocks if this is a file addition operation.
+     * @param allocatedUsers    The list of user IDs whose allocation lists have
+     *                          been modified.
+     * @return                  The first bloc of the file if this is a file
+     *                          addition operation or -1 otherwise.
+     * @throws SQLException
+     * @throws NeguraEx
+     */
+    // TODO: This only handles adding files now.
+    public int insertOperationAndAllocate(Operation op, int creatorId,
+            List<Integer> allocatedUsers) throws SQLException, NeguraEx {
+        Connection c = null;
+        Statement s = null;
+        PreparedStatement ps = null;
 
-        if (!blockIds.isEmpty()) {
-            ps = c.prepareStatement("INSERT INTO allocated VALUES (?, ?, ?);");
-            int order = 1; // Order index starts at 1.
-            for (Integer blockId : blockIds) {
-                ps.setInt(1, userId);
-                ps.setInt(2, blockId);
-                ps.setInt(3, order);
-                order++;
+        try {
+            c = connectionPool.getConnection();
+
+            // Starting transaction.
+            c.setAutoCommit(false);
+
+            // Checking to see if there are enough blocks in the system.
+            int freeBlocks = Integer.parseInt(getValue(c, "free_blocks"));
+            if (op.blocks.length > freeBlocks) {
+                throw new NeguraEx("The file requires %d blocks but " +
+                        "there are %d left.", op.blocks.length, freeBlocks);
+            }
+
+            int firstFreeBlock = Integer.parseInt(getValue(c,
+                    "first_free_block"));
+
+            // Updating the settings.
+            setValues(c,
+                "free_blocks",
+                    Integer.toString(freeBlocks - op.blocks.length),
+                "first_free_block",
+                    Integer.toString(firstFreeBlock + op.blocks.length)
+            );
+
+            // Getting the ID for the operation.
+            op.oid = (int)(long)(Long)singleValueResult(c,
+                    "SELECT nextval('operationSeq')");
+
+            // Inserting the operation.
+            ps = c.prepareStatement("INSERT INTO "
+                + "operations VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
+            ps.setInt(1, op.oid);
+            ps.setString(2, op.path);
+            ps.setString(4, op.signature);
+            ps.setInt(5, op.date);
+            ps.setString(8, op.type);
+
+            if (op.type.equals("add")) {
+                ps.setNull(3, Types.VARCHAR);
+                ps.setLong(6, op.size);
+                ps.setString(7, op.hash);
+            } else if (op.type.equals("move")) {
+                ps.setString(3, op.newPath);
+                ps.setNull(6, Types.BIGINT);
+                ps.setNull(7, Types.VARCHAR);
+            } else if (op.type.equals("delete")) {
+                ps.setNull(3, Types.VARCHAR);
+                ps.setNull(6, Types.BIGINT);
+                ps.setNull(7, Types.VARCHAR);
+            } else {
+                throw new AssertionError("No such operation.");
+            }
+
+            ps.executeUpdate();
+            ps.close();
+
+            ps = c.prepareStatement(
+                "UPDATE blocks "+
+                "SET hash = ? " +
+                "WHERE bid = ?"
+            );
+
+            for (int i = 0; i < op.blocks.length; i++) {
+                ps.setString(1, op.blocks[i].hash);
+                ps.setInt(2, firstFreeBlock + i);
+                ps.addBatch();
+            }
+
+            ps.executeBatch();
+            ps.close();
+
+            // Getting the updated blocks for each user.
+            ps = c.prepareStatement(
+                "SELECT uid, bid " +
+                "FROM allocated " +
+                "WHERE bid >= ? AND bid < ?"
+            );
+            ps.setInt(1, firstFreeBlock);
+            ps.setInt(2, firstFreeBlock + op.blocks.length);
+            ResultSet results = ps.executeQuery();
+
+            HashMap<Integer, ArrayList<Integer>> forUser =
+                    new HashMap<Integer, ArrayList<Integer>>();
+
+            Integer uid, bid;
+            ArrayList<Integer> newList;
+            while (results.next()) {
+                uid = results.getInt(1);
+                bid = results.getInt(2);
+                if (forUser.containsKey(uid)) {
+                    forUser.get(uid).add(bid);
+                } else {
+                    newList = new ArrayList<Integer>();
+                    newList.add(uid);
+                    forUser.put(uid, newList);
+                }
+            }
+            results.close();
+            ps.close();
+
+            // Selecting the new index for each user with "for update".
+            s = c.createStatement();
+            results = s.executeQuery(
+                "SELECT uid, newindex " +
+                "FROM users " +
+                "WHERE uid IN " + sqlList(forUser.keySet())
+            );
+
+            HashMap<Integer, Integer> newIndex =
+                    new HashMap<Integer, Integer>();
+
+            while (results.next()) {
+                newIndex.put(results.getInt(1), results.getInt(2));
+            }
+            results.close();
+            s.close();
+
+            if (newIndex.size() != forUser.size()) {
+                throw new NeguraEx("Different user sizes %d != %d.",
+                        newIndex.size(), forUser.size());
+            }
+
+            // Modifying the allocation list for each user.
+            ps = c.prepareStatement(
+                "INSERT INTO alist " +
+                "VALUES (?, ?, ?)"
+            );
+            int userId, currIndex;
+            for (Entry<Integer, Integer> pair : newIndex.entrySet()) {
+                userId = pair.getKey();
+                currIndex = pair.getValue();
+
+                for (Integer blockId : forUser.get(userId)) {
+                    ps.setInt(1, userId);
+                    ps.setInt(2, blockId);
+                    ps.setInt(3, currIndex);
+                    ps.addBatch();
+                    currIndex++;
+                }
+            }
+            ps.executeBatch();
+            ps.close();
+
+            // Modifying the new index for each user.
+            ps = c.prepareStatement(
+                "UPDATE users " +
+                "SET newindex = ? " +
+                "WHERE id = ?"
+            );
+
+            int newIndexVal;
+            for (Entry<Integer, Integer> pair : newIndex.entrySet()) {
+                uid = pair.getKey();
+                newIndexVal = pair.getValue() + forUser.get(uid).size();
+
+                ps.setInt(1, newIndexVal);
+                ps.setInt(2, uid);
+                ps.addBatch();
+            }
+
+            ps.executeBatch();
+            ps.close();
+
+            // Adding the temp blocks for the creator.
+            // TODO: There should be a setting for this available to the creator
+            // as well.
+            int deleteTime = (int)(System.currentTimeMillis()/1000) + 12*60*60;
+
+            ps = c.prepareStatement(
+                "INSERT INTO tempblocks " +
+                "VALUES (?, ?, ?)"
+            );
+            for (int i = 0; i < op.blocks.length; i++) {
+                ps.setInt(1, creatorId);
+                ps.setInt(2, firstFreeBlock + i);
+                ps.setInt(3, deleteTime);
                 ps.addBatch();
             }
             ps.executeBatch();
             ps.close();
-        }
-        
-        c.close();
 
-        return userId;
+            // "Returning" the users who had their lists modified.
+            allocatedUsers.addAll(forUser.keySet());
+
+            return firstFreeBlock;
+        } catch (SQLException ex) {
+            c.rollback();
+            throw ex;
+        } catch (NeguraEx ex) {
+            c.rollback();
+            throw ex;
+        } finally {
+            closeQuietly(s);
+            closeQuietly(ps);
+            closeQuietlyEndTransaction(c);
+        }
+    }
+
+    /**
+     * Returns a list of peers of each of the given blocks.
+     * @param blocks        List of block IDs for which to return peers.
+     * @return              A map of the block IDs to the list of peer addresses
+     *                      represented as strings.
+     * @throws SQLException
+     */
+    public Map<Integer, ArrayList<String>>
+            getPeersForBlocks(List<Integer> blocks) throws SQLException {
+        Map<Integer, ArrayList<String>> ret =
+                new HashMap<Integer, ArrayList<String>>();
+        Connection c = null;
+        Statement s = null;
+
+        try {
+            c = connectionPool.getConnection();
+            s = c.createStatement();
+            ResultSet results = s.executeQuery(
+                "SELECT c.bid, u.ip || ':' || u.port " +
+                "FROM completed c, users u " +
+                "WHERE c.uid = u.uid AND c.bid IN " + sqlList(blocks)
+            );
+
+            Integer userId;
+            String address;
+            ArrayList<String> addTo;
+
+            while (results.next()) {
+                userId = results.getInt(1);
+                address = results.getString(2);
+
+                addTo = ret.get(userId);
+                if (addTo == null) {
+                    addTo = new ArrayList<String>();
+                    ret.put(userId, addTo);
+                }
+                addTo.add(address);
+            }
+
+            results.close();
+
+            return ret;
+        } finally {
+            closeQuietly(s);
+            closeQuietly(c);
+        }
+    }
+
+    /**
+     * Returns all the addresses of the specified user IDs, but not in order.
+     * @param userIds       The user IDs.
+     * @return              The list of addresses.
+     * @throws SQLException
+     */
+    public List<String> getUserAddresses(Collection<Integer> userIds)
+            throws SQLException {
+        Connection c = null;
+        Statement s = null;
+
+        try {
+            c = connectionPool.getConnection();
+            s = c.createStatement();
+            ResultSet results = s.executeQuery(
+                "SELECT ip || ':' || port " +
+                "FROM users " +
+                "WHERE id IN " + sqlList(userIds)
+            );
+
+            List<String> addresses = new ArrayList<String>();
+
+            while (results.next()) {
+                addresses.add(results.getString(1));
+            }
+
+            results.close();
+
+            return addresses;
+        } finally {
+            closeQuietly(s);
+            closeQuietly(c);
+        }
     }
 
     /**
@@ -195,447 +550,292 @@ public class DataManager {
      */
     public List<InetSocketAddress> getRecentUserAddresses()
             throws SQLException {
-        LinkedList<InetSocketAddress> ret = new LinkedList<InetSocketAddress>();
-        InetSocketAddress a;
+        Connection c = null;
+        Statement s = null;
 
-        Connection c = connectionPool.getConnection();
-        Statement s = c.createStatement();
-        ResultSet results = s.executeQuery("SELECT ip, port FROM users;");
-        while (results.next()) {
-            a = new InetSocketAddress(results.getString(1), results.getInt(2));
-            ret.add(a);
-        }
-        results.close();
-        s.close();
-        c.close();
-
-        return ret;
-    }
-
-    // Checks if a query returns any rows.
-    public boolean returnsRows(String sqlText) {
         try {
-            Connection c = connectionPool.getConnection();
-            Statement s = c.createStatement();
-            ResultSet results = s.executeQuery(sqlText);
-            boolean ret = results.next();
+            c = connectionPool.getConnection();
+            s = c.createStatement();
+            // TODO: Do this properly. Now it selects everyone.
+            ResultSet results = s.executeQuery(
+                "SELECT ip, port " +
+                "FROM users"
+            );
+
+            List<InetSocketAddress> ret = new ArrayList<InetSocketAddress>();
+
+            while (results.next()) {
+                ret.add(new InetSocketAddress(results.getString(1),
+                        results.getInt(2)));
+            }
+
             results.close();
-            s.close();
-            c.close();
+
             return ret;
-        } catch (Exception ex) {
-            NeguraLog.severe(ex);
-        }
-
-        return false;
-    }
-
-    // TODO: delete this
-    public int singleRowResult(String sqlText) throws SQLException {
-        Connection c = connectionPool.getConnection();
-        int ret = singleRowResult(c, sqlText);
-        c.close();
-        return ret;
-    }
-
-    // Returns the first result of a query as an int.
-    // TODO: this should be private.
-    private int singleRowResult(Connection c, String sqlText)
-            throws SQLException {
-        Statement s = c.createStatement();
-        ResultSet results = s.executeQuery(sqlText);
-        results.next();
-        int ret = results.getInt(1);
-        results.close();
-        s.close();
-        return ret;
-    }
-
-    // TODO: de ce nu întoarce mereu?
-    public Map<Integer, ArrayList<String>>
-            peersForBlocks(ArrayList<Integer> blocks) throws SQLException {
-        Map<Integer, ArrayList<String>> ret =
-                new HashMap<Integer, ArrayList<String>>();
-
-        Connection c = connectionPool.getConnection();
-        Statement s = c.createStatement();
-        String query = "SELECT c.bid, u.ip || ':' || u.port "
-                + "FROM completed c, users u WHERE c.id = u.id "
-                + "AND c.bid IN " + sqlList(blocks);
-        ResultSet results = s.executeQuery(query);
-
-        while (results.next()) {
-            Integer blockId = results.getInt(1);
-            String address = results.getString(2);
-
-            if (ret.containsKey(blockId)) {
-                ret.get(blockId).add(address);
-            } else {
-                ArrayList<String> add = new ArrayList<String>();
-                add.add(address);
-                ret.put(blockId, add);
-            }
-        }
-
-        if (ret.isEmpty()) {
-            NeguraLog.warning("Bad problem. Fix this.");
-            ret = peersForBlocks(blocks);
-        }
-
-        results.close();
-        s.close();
-        c.close();
-        return ret;
-    }
-    
-    private static class Allocation {
-        public int id;
-        public int startIndex;
-        public int canUse;
-        private int filled = 0;
-        public int[] blocks;
-
-        public void add(int block) {
-            blocks[filled] = block;
-            filled++;
-        }
-
-        public boolean isFull() {
-            return filled == blocks.length;
+        } finally {
+            closeQuietly(s);
+            closeQuietly(c);
         }
     }
 
     /**
-     * Gets a list of users which can provide a specified number of unallocated
-     * blocks; the method also updates the block count and start index in
-     * preparation for the allocation.
-     * @param c                 The connection to be used.
-     * @param excludeId         The id which should be excluded because he added
-     *                          the operation.
-     * @param blocksNeeded      The sum of the blocks which the returned users
-     *                          should provide.
-     * @param maxPerUser        The maximum number of blocks per user.
-     * @return                  A list of Allocation objects.
+     * Sets the block specified as completed for the user.
+     * @param userId        The user which has completed the blocks.
+     * @param blockIds      The list of block IDs.
      * @throws SQLException
      */
-    private List<Allocation> getUserIdsFor(Connection c, int excludeId,
-            int blocksNeeded, int maxPerUser) throws SQLException {
-        List<Allocation> ret = new ArrayList<Allocation>();
-        
-        Statement s = c.createStatement();
-        // Select all the users which have blocks available to be allocated, in
-        // a random order and close it when you have enough.
-        // TODO: find out if all the rows of the selection are locked, or only
-        // the ones which are retrieved.
-        ResultSet results = s.executeQuery("SELECT id, nblocks - bcount, "
-                + "newindex FROM users "
-                + "WHERE bcount < nblocks AND id <> " + excludeId
-                + " ORDER BY random() FOR UPDATE;");
-
-        Allocation a;
-        int used = 0;
-
-        while (results.next()) {
-            a = new Allocation();
-            a.id = results.getInt(1);
-            a.canUse = results.getInt(2);
-            if (a.canUse > maxPerUser)
-                a.canUse = maxPerUser;
-            a.startIndex = results.getInt(3);
-            a.blocks = new int[a.canUse];
-            ret.add(a);
-
-            used += a.canUse;
-            if (used >= blocksNeeded)
-                break;
-        }
-
-        results.close();
-        s.close();
-
-        // TODO: handle this properly.
-        if (used < blocksNeeded)
-            throw new SQLException("Not enough blocks in the system. Could only"
-                    + " find " + used + " of " + blocksNeeded + " blocks.");
-
-        // Now update the number of blocks allocated and the start index.
-        PreparedStatement ps = c.prepareStatement("UPDATE users "
-                + "SET newindex = newindex + ?, bcount = bcount + ?"
-                + "WHERE id = ?;");
-
-        for (Allocation al : ret) {
-            ps.setInt(1, al.canUse);
-            ps.setInt(2, al.canUse);
-            ps.setInt(3, al.id);
-            ps.addBatch();
-        }
-        ps.executeBatch();
-
-        return ret;
-    }
-
-    private void fillBlocks(List<Allocation> list, int[] blocks) {
-        List<Allocation> stop = new ArrayList<Allocation>(list.size());
-        int index = 0;
-        int giveTo;
-        Allocation a;
-
-        while (!list.isEmpty()) {
-            giveTo = (int) (Math.random() * list.size());
-            a = list.get(giveTo);
-            a.add(blocks[index]);
-            if (a.isFull()) {
-                list.remove(giveTo);
-                stop.add(a);
-            }
-
-            // The block index loops like in a ring.
-            index++;
-            if (index == blocks.length)
-                index = 0;
-        }
-
-        // Put all the elements back.
-        list.addAll(stop);
-    }
-
-    /**
-     * Updates the creator's start index and block count and returns the the one
-     * before the update
-     * @param c
-     * @param userId
-     * @param length
-     * @return
-     */
-    private int updateCreatorStartIndex(Connection c, int userId, int length)
+    public void insertCompleted(int userId, Collection<Integer> blockIds)
             throws SQLException {
-        Statement s = c.createStatement();
-        ResultSet results = s.executeQuery("SELECT nblocks - bcount, newindex "
-                + "FROM users WHERE id = " + userId + " FOR UPDATE;");
-        results.next();
-        int blocksLeft = results.getInt(1);
-        int newIndex = results.getInt(2);
-        results.close();
-        s.close();
+        Connection c = null;
+        PreparedStatement ps = null;
 
-        if (blocksLeft < length)
-            throw new SQLException("The creator doesn't have enough blocks to"
-                    + "add this operation.");
-
-        PreparedStatement ps = c.prepareStatement("UPDATE users "
-                + "SET newindex = newindex + ?, bcount = bcount + ?"
-                + "WHERE id = ?;");
-        ps.setInt(1, length);
-        ps.setInt(2, length);
-        ps.setInt(3, userId);
-        ps.executeUpdate();
-        ps.close();
-
-        return newIndex;
-    }
-
-    private int userCount(Connection c) throws SQLException {
-        return singleRowResult(c, "SELECT count(*) FROM users;");
-    }
-
-    /**
-     *
-     * @param userId
-     * @param op
-     * @return              The list of users who had blocks allocated to them.
-     * @throws SQLException
-     */
-    public List<Integer> insertOperationAndAllocate(int userId, Operation op)
-            throws SQLException {
-        // Inserting the operation.
-        Connection c = connectionPool.getConnection();
-        PreparedStatement ps = c.prepareStatement("INSERT INTO "
-                + "operations VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
-
-        ps.setInt(1, op.id);
-        ps.setString(2, op.path);
-        ps.setString(4, op.signature);
-        ps.setInt(5, op.date);
-        ps.setString(8, op.type);
-
-        if (op.type.equals("add")) {
-            ps.setNull(3, Types.VARCHAR);
-            ps.setLong(6, op.size);
-            ps.setString(7, op.hash);
-        } else if (op.type.equals("move")) {
-            ps.setString(3, op.newPath);
-            ps.setNull(6, Types.BIGINT);
-            ps.setNull(7, Types.VARCHAR);
-        } else if (op.type.equals("delete")) {
-            ps.setNull(3, Types.VARCHAR);
-            ps.setNull(6, Types.BIGINT);
-            ps.setNull(7, Types.VARCHAR);
-        } else throw new AssertionError("No such operation.");
-        ps.executeUpdate();
-        ps.close();
-
-        // Inserting the blocks.
-        ps = c.prepareStatement(
-                "INSERT INTO blocks VALUES (?, ?, ?);");
-
-        ArrayList<Integer> blockIds = new ArrayList<Integer>();
-
-        for (Block block : op.blocks) {
-            ps.setInt(1, block.id);
-            ps.setString(2, block.hash);
-            ps.setInt(3, op.id);
-            ps.addBatch();
-            blockIds.add(block.id);
-        }
-        ps.executeBatch();
-        ps.close();
-
-        // Inserting the allocated blocks.
-        List<Integer> ret = new ArrayList<Integer>();
-
-        // This begins a new transaction.
-        c.setAutoCommit(false);
-        
         try {
-            int multiplicity = 2;
-            int blocksNeeded = op.blocks.length * multiplicity;
-            int maxPerUser = (int) Math.ceil(((double) blocksNeeded) /
-                    (userCount(c) - 1));
-            List<Allocation> allocations = getUserIdsFor(c, userId,
-                    blocksNeeded, maxPerUser);
-            fillBlocks(allocations, op.getBlockIds());
-
-
+            c = connectionPool.getConnection();
             ps = c.prepareStatement(
-                    "INSERT INTO allocated VALUES (?, ?, ?);");
+                "INSERT INTO completed " +
+                "VALUES (?, ?)"
+            );
 
-            for (Allocation a : allocations) {
-                ret.add(a.id);
-                for (int i = 0; i < a.canUse; i++) {
-                    ps.setInt(1, a.id);
-                    ps.setInt(2, a.blocks[i]);
-                    ps.setInt(3, a.startIndex + i);
-                    ps.addBatch();
-                }
-            }
-
-            // The user who created this, already has them so add the blocks to
-            // the allocated blocks.
-            int startIndex = updateCreatorStartIndex(c, userId,
-                    op.blocks.length);
-            int offset = 0;
             for (Integer blockId : blockIds) {
                 ps.setInt(1, userId);
                 ps.setInt(2, blockId);
-                ps.setInt(3, startIndex + offset);
                 ps.addBatch();
-                offset++;
             }
 
             ps.executeBatch();
-            ps.close();
-            // End the transaction.
-            c.commit();
-            c.setAutoCommit(true); // Set autocomit back on after no exception.
-
-        } catch (SQLException ex) {
-            c.rollback(); // TODO: Shouldn't I roll back the operation too?
-            c.setAutoCommit(true); // Set autocommit back on after exception.
-            throw ex;
+        } finally {
+            closeQuietly(ps);
+            closeQuietly(c);
         }
-
-
-        c.close();
-
-        // Set the blocks as being completed by the user who added them.
-        insertCompleted(userId, blockIds);
-        return ret;
     }
 
-    public void insertCompleted(int uid, Collection<Integer> blocks)
+    /**
+     * Returns the modification to the block list for a specified user after the
+     * given order ID which is not included..
+     * @param userId        The owner of the list.
+     * @param after         The order after which to return. If 0, returns all.
+     * @return              The list of block list modifications.
+     * @throws SQLException
+     */
+    public List<Integer> getBlockListAfter(int userId, int after)
             throws SQLException {
-        Connection c = connectionPool.getConnection();
-        PreparedStatement ps = c.prepareStatement("INSERT INTO "
-                + "completed VALUES (?, ?);");
+        Connection c = null;
+        Statement s = null;
 
-        for (Integer bid : blocks) {
-            ps.setInt(1, uid);
-            ps.setInt(2, bid);
-            ps.addBatch();
+        try {
+            c = connectionPool.getConnection();
+            s = c.createStatement();
+            ResultSet results = s.executeQuery(
+                "SELECT bid " +
+                "FROM alist " +
+                "WHERE uid = " + userId + " AND orderb > " + after
+            );
+
+            List<Integer> ret = new ArrayList<Integer>();
+
+            while (results.next())
+                ret.add(results.getInt(1));
+
+            results.close();
+
+            return ret;
+        } finally {
+            closeQuietly(s);
+            closeQuietly(c);
         }
-
-        ps.executeBatch();
-        ps.close();
-        c.close();
     }
 
-    public List<Integer> getBlockList(int uid) throws SQLException {
-        List<Integer> ret = new ArrayList<Integer>();
+    /**
+     * Returns the operations after the specified operation ID which is not
+     * included.
+     * @param oid       The operation ID. If it's 0, returns all.
+     * @return          The list of operations.
+     * @throws SQLException
+     */
+    public List<Operation> getOperationsAfter(int oid) throws SQLException {
+        Connection c = null;
+        Statement s = null;
 
-        Connection c = connectionPool.getConnection();
-        Statement s = c.createStatement();
-        ResultSet results = s.executeQuery("SELECT bid FROM allocated " +
-                "WHERE id = " + uid + ";");
+        try {
+            c = connectionPool.getConnection();
+            s = c.createStatement();
+            ResultSet results = s.executeQuery(
+                "SELECT * " +
+                "FROM operations " +
+                "WHERE oid > " + oid + " " +
+                "ORDER BY oid"
+            );
 
-        while (results.next())
-            ret.add(results.getInt(1));
-        
-        results.close();
-        s.close();
-        c.close();
-        return ret;
-    }
+            List<Operation> ret = new ArrayList<Operation>();
 
-    public List<Operation> operationsAfter(int opid) throws SQLException {
-        List<Operation> ret = new ArrayList<Operation>();
-
-        Connection c = connectionPool.getConnection();
-        Statement s = c.createStatement();
-        ResultSet results = s.executeQuery("SELECT * FROM operations " +
-                "WHERE id > " + opid + " ORDER BY id;");
-        Operation o;
-        while (results.next()) {
-            o = new Operation();
-            o.id = results.getInt(1);
-            o.path = results.getString(2);
-            o.newPath = results.getString(3);
-            o.signature = results.getString(4);
-            o.date = results.getInt(5);
-            o.size = results.getLong(6);
-            o.hash = results.getString(7);
-            o.type = results.getString(8);
-            ret.add(o);
-        }
-        results.close();
-
-        results = s.executeQuery("SELECT * FROM blocks WHERE opid > " + opid
-                + " ORDER BY opid, id;");
-
-        int lastOpId = -1;
-        int currentOpId = -1;
-        int index = -1;
-        LinkedList<Block> blocks = null;
-        while (results.next()) {
-            currentOpId = results.getInt(3);
-            if (currentOpId != lastOpId) {
-                if (index >= 0) {
-                    ret.get(index).blocks = blocks.toArray(new Block[0]);
-                }
-
-                index++;
-                lastOpId = currentOpId;
-                blocks = new LinkedList<Block>();
+            Operation o;
+            while (results.next()) {
+                o = new Operation();
+                o.oid = results.getInt(1);
+                o.path = results.getString(2);
+                o.newPath = results.getString(3);
+                o.signature = results.getString(4);
+                o.date = results.getInt(5);
+                o.size = results.getLong(6);
+                o.hash = results.getString(7);
+                o.type = results.getString(8);
+                o.firstbid = results.getInt(9);
+                o.lastbid = results.getInt(10);
+                ret.add(o);
             }
-            blocks.add(new Block(results.getInt(1), results.getString(2)));
+
+            results.close();
+
+            return ret;
+        } finally {
+            closeQuietly(s);
+            closeQuietly(c);
         }
-        if (index >= 0)
-            ret.get(index).blocks = blocks.toArray(new Block[0]);
+    }
 
-        results.close();
-        s.close();
-        c.close();
+    /**
+     * Gets returns the hashes for the given block IDs.
+     * @param blockIds      The collection of block IDs.
+     * @return              A list of blocks with hashes.
+     * @throws SQLException 
+     */
+    public List<Block> getHashesForBlocks(Collection<Integer> blockIds)
+            throws SQLException {
+        Connection c = null;
+        Statement s = null;
 
-        return ret;
+        try {
+            c = connectionPool.getConnection();
+            s = c.createStatement();
+            ResultSet results = s.executeQuery(
+                "SELECT * " +
+                "FROM blocks " +
+                "WHERE bid IN " + sqlList(blockIds)
+            );
+
+            List<Block> ret = new ArrayList<Block>();
+
+            Block b;
+            while (results.next()) {
+                b = new Block();
+                b.bid = results.getInt(1);
+                b.hash = results.getString(2);
+                ret.add(b);
+            }
+
+            results.close();
+
+            return ret;
+        } finally {
+            closeQuietly(s);
+            closeQuietly(c);
+        }
+    }
+
+    /**
+     * Close a connection without causing a fatal error.
+     * @param c     The connection to be closed. Can be null.
+     */
+    private void closeQuietly(Connection c) {
+        if (c != null) {
+            try {
+                c.close();
+            } catch (SQLException ex) {
+                NeguraLog.warning(ex);
+            }
+        }
+    }
+
+    /**
+     * End the transaction and close the connection without causing a fatal
+     * error.
+     * @param c     The connection to be close. Can be null.
+     */
+    private void closeQuietlyEndTransaction(Connection c) {
+        if (c != null) {
+            try {
+                c.setAutoCommit(true);
+                c.close();
+            } catch (SQLException ex) {
+                NeguraLog.warning(ex);
+            }
+        }
+    }
+
+    /**
+     * Close a statement without causing a fatal error.
+     * @param s     The statement to be closed. Can be null.
+     */
+    private void closeQuietly(Statement s) {
+        if (s != null) {
+            try {
+                s.close();
+            } catch (SQLException ex) {
+                NeguraLog.warning(ex);
+            }
+        }
+    }
+
+    /**
+     * Close a prepared statement without causing a fatal error.
+     * @param ps     The prepared statement to be closed. Can be null.
+     */
+    private void closeQuietly(PreparedStatement ps) {
+        if (ps != null) {
+            try {
+                ps.close();
+            } catch (SQLException ex) {
+                NeguraLog.warning(ex);
+            }
+        }
+    }
+
+    /**
+     * Checks if a query returns results; can be used for select "commands" like
+     * setval.
+     * @param c             The open connection.
+     * @param sqlText       The SQL query.
+     * @return              True if the query returns at least one row.
+     * @throws SQLException
+     */
+    private boolean returnsRows(Connection c, String sqlText)
+            throws SQLException {
+        Statement s = null;
+        try {
+            s = c.createStatement();
+            ResultSet results = s.executeQuery(sqlText);
+            boolean atLeastOneRow = results.next();
+            results.close();
+            return atLeastOneRow;
+        } finally {
+            closeQuietly(s);
+        }
+    }
+
+    /**
+     * Returns the first row of the first column of the result of the query.
+     * This method does not enforce that the query should be a single value
+     * table.
+     *
+     * @param c             The open connection.
+     * @param sqlText       The SQL query.
+     * @return              The result as an object whose type corresponds to
+     *                      the column's SQL type.
+     * @throws SQLException
+     */
+    private Object singleValueResult(Connection c, String sqlText)
+            throws SQLException {
+        Statement s = null;
+        try {
+            s = c.createStatement();
+            ResultSet results = s.executeQuery(sqlText);
+            results.next();
+            Object ret = results.getObject(1);
+            results.close();
+            return ret;
+        } finally {
+            closeQuietly(s);
+        }
     }
 
     /**
@@ -646,12 +846,89 @@ public class DataManager {
      * @param list      The list of elements
      * @return          A string containing the elements.
      */
-    private <E> String sqlList(List<E> list) {
-        StringBuilder builder = new StringBuilder(list.size() * 4); // Suppose
+    private <E> String sqlList(Collection<E> list) {
+        StringBuilder builder = new StringBuilder(list.size() * 4); // Suppose.
         builder.append('(');
         for (E e : list)
             builder.append(e.toString()).append(',');
         builder.deleteCharAt(builder.length() - 1).append(')');
         return builder.toString();
+    }
+
+
+    /**
+     * Initalizes a list of settings that can have their values modified later
+     * on.
+     * @param c             The open connection.
+     * @param keyvalues     An array of key-value pairs.
+     * @throws SQLException
+     */
+    private void initializeValues(Connection c, String... keyvalues)
+            throws SQLException {
+        if (keyvalues.length % 2 != 0)
+            throw new RuntimeException("The last key is missing a value.");
+
+        PreparedStatement ps = null;
+        try {
+            ps = c.prepareStatement("INSERT INTO settings VALUES (?, ?)");
+            for (int i = 0; i < keyvalues.length; i += 2) {
+                ps.setString(1, keyvalues[i]);
+                ps.setString(2, keyvalues[i+1]);
+                ps.addBatch();
+            }
+            ps.executeBatch();
+        } finally {
+            closeQuietly(ps);
+        }
+    }
+
+    /**
+     * Returns a value from the settings table as a string.
+     * @param c             The open connection.
+     * @param key           Identifier-like string.
+     * @return              The property as a string.
+     * @throws SQLException
+     */
+    private String getValue(Connection c, String key) throws SQLException {
+        Statement s = null;
+        try {
+            s = c.createStatement();
+            ResultSet results = s.executeQuery("SELECT value FROM settings"
+                    + "WHERE key = '" + key + "'");
+            results.next();
+            String ret = results.getString(1);
+            results.close();
+            return ret;
+        } finally {
+            closeQuietly(s);
+        }
+    }
+
+    /**
+     * Updates a list of key-value pairs; the settings must have been previously
+     * initialized with {@link DataManager#initializeValues(java.sql.Connection,
+     * java.lang.String[])}.
+     * @param c             The open connection.
+     * @param keyvalues     The array of key-value pairs.
+     * @throws SQLException
+     */
+    private void setValues(Connection c, String... keyvalues)
+            throws SQLException {
+        if (keyvalues.length % 2 != 0)
+            throw new RuntimeException("The last key is missing a value.");
+
+        PreparedStatement ps = null;
+        try {
+            ps = c.prepareStatement("UPDATE settings SET value = ? " +
+                    "WHERE key = ?");
+            for (int i = 0; i < keyvalues.length; i += 2) {
+                ps.setString(1, keyvalues[i + 1]); // value
+                ps.setString(2, keyvalues[i]);     // key
+                ps.addBatch();
+            }
+            ps.executeBatch();
+        } finally {
+            closeQuietly(ps);
+        }
     }
 }

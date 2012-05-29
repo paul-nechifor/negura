@@ -43,7 +43,7 @@ public class NeguraFtpServer extends Service {
 
         // Replacing the default listener with a custom port.
         ListenerFactory factory = new ListenerFactory();
-        factory.setPort(cm.getFtpPort());
+        factory.setPort(openedOnPort);
         serverFactory.addListener("default", factory.createListener());
 
         // Setting the filesystem view.

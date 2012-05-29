@@ -9,16 +9,18 @@ import java.util.List;
 import negura.client.ClientConfigManager;
 import negura.common.util.Util;
 import negura.common.data.Operation;
+import negura.common.ex.NeguraError;
 
 /**
  *
  * @author Paul Nechifor
  */
 public class NeguraFileInputStream extends InputStream {
-    private ClientConfigManager cm;
+    private final ClientConfigManager cm;
+
     private int blockSize;
-    private int[] blockIds;
-    private long size;
+    private final int[] blockIds;
+    private final long size;
     private long position;
     private int blockIndex = 0;
     private InputStream currBlock;
@@ -26,25 +28,27 @@ public class NeguraFileInputStream extends InputStream {
     public NeguraFileInputStream(NeguraFile file, long offset)
             throws IOException {
         cm = file.fsView.getConfigManager();
-        Operation o = file.fsView.getOperation(file.operationId);
-
-        blockIds = o.getBlockIds();
-        List<Integer> blockList = new ArrayList<Integer>(blockIds.length);
-        for (int i : blockIds)
-            blockList.add(i);
-        // Tell the peer cache to ready the peer lists for the blocks.
-        cm.getPeerCache().preemptivelyCache(blockList);
-        blockSize = cm.getServerInfoBlockSize();
+        blockSize = cm.getBlockSize();
         size = file.size;
-        
+
         if (offset < 0 || offset >= size)
             throw new IOException("Invalid offset.");
 
         position = offset;
         blockIndex = (int) (position / blockSize);
-        int blockOffset = (int) (position % blockSize);
 
-        makeBlockAvailable(blockIds[blockIndex], blockOffset);
+        Operation o = file.fsView.getOperation(file.operationId);
+
+        // Getting the block IDs.
+        blockIds = new int[o.lastbid - o.firstbid + 1];
+        for (int i = 0; i < blockIds.length; i++)
+            blockIds[i] = o.firstbid + i;
+
+        // Tell the peer cache to ready the peer lists for the blocks.
+        cm.getPeerCache().preemptivelyCache(blockIds);
+
+        // Load the first block.
+        makeBlockAvailable(blockIds[blockIndex], (int)position % blockSize);
     }
 
     /**
@@ -91,7 +95,7 @@ public class NeguraFileInputStream extends InputStream {
             leftInBlock = blockSize - (int)(position % blockSize);
 
         if (leftInBlock == 0)
-            throw new AssertionError("Cannot happen.");
+            throw new NeguraError("Cannot happen.");
 
         int readFromBlock = (length < leftInBlock) ? length : leftInBlock;
         Util.readBytes(buffer, offset, readFromBlock, currBlock);
@@ -118,20 +122,19 @@ public class NeguraFileInputStream extends InputStream {
 
     @Override
     public long skip(long n) throws IOException {
-        System.out.println("Used this.");
-        System.exit(1);
-
         if (n < 0)
-            throw new AssertionError("Can't do negative skip.");
-        position += n;
-        if (position >= size)
-            throw new IOException("Was asked to skip over file size.");
+            throw new NeguraError("Negative skip: %d.", n);
 
-        int newBlock = (int) (position / blockSize);
+        position += n;
+        if (position >= size) {
+            throw new IOException(String.format("Can't skip to %d which is " +
+                    "beyond size %d.", position, size));
+        }
+
+        int newBlock = (int) position / blockSize;
         if (newBlock != blockIndex) {
             blockIndex = newBlock;
-            makeBlockAvailable(blockIds[blockIndex],
-                    (int) (position % blockSize));
+            makeBlockAvailable(blockIds[blockIndex], (int)position % blockSize);
         } else {
             currBlock.skip(n);
         }
@@ -139,26 +142,24 @@ public class NeguraFileInputStream extends InputStream {
         return n;
     }
 
-    // Trys to open the InputStream to the specified block either by finding it
+    // Tries to open the InputStream to the specified block either by finding it
     // in the saved blocks or by getting it by the wire.
     private void makeBlockAvailable(int blockId, int offset)
             throws IOException {
+        // Closing the last block.
         if (currBlock != null)
             currBlock.close();
 
-        File f = cm.fileForBlockId(blockId);
-        if (f != null) {
+        File blockFile = cm.getBlockList().getBlockFileIfExists(blockId);
+        if (blockFile != null) {
             // Block was found locally.
-            currBlock = new FileInputStream(f);
-            if (offset > 0)
-                currBlock.skip(offset);
-            return;
+            currBlock = new FileInputStream(blockFile);
+        } else {
+            // Getting the block through the cache.
+            currBlock = cm.getBlockCache().getBlockInputStream(blockId);
         }
-
-        currBlock = cm.getBlockCache().getBlockInputStream(blockId);
+        
         if (offset > 0)
             currBlock.skip(offset);
-        if (currBlock == null)
-            throw new IOException("Couldn't find any peer with this block.");
     }
 }

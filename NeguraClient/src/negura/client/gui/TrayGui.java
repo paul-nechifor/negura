@@ -70,7 +70,7 @@ public class TrayGui extends Service {
     private void load() {
         mainShell.setImage(icons.get("trayicon"));
         trayItem.setImage(icons.get("trayicon"));
-        trayItem.setToolTipText(I18n.format("servingOn", cm.getPort()));
+        trayItem.setToolTipText(I18n.format("servingOn", cm.getServicePort()));
 
         final Menu menu = new Menu(mainShell, SWT.POP_UP);
         final MenuItem startFtpMi = n(menu, SWT.CHECK, I18n.get("startFtp"), null);

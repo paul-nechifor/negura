@@ -10,14 +10,13 @@ import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
 /**
- * The static class which logs all the messages of the program. At startup,
- * quitOnSevere is set to true and the default console handler and formatter are
- * added.
+ * The static class which logs all the messages of the program. At startup, the
+ * default console handler and formatter are added. All severe mathods will
+ * result in application exit.
  * @author Paul Nechifor
  */
 public class NeguraLog {
     private static final Logger LOGGER = Logger.getLogger("Negura");
-    private static boolean QUIT_ON_SEVERE = true;
     private static boolean IS_CONSOLE_HANDLER_SET = false;
     private static final ConsoleHandler CONSOLE_HANDLER = new ConsoleHandler();
     public static final Formatter FORMATTER = new Formatter() {
@@ -88,7 +87,7 @@ public class NeguraLog {
     private static void log(Level level, String message, Throwable throwable) {
         LOGGER.log(level, message, throwable);
 
-        if (level == Level.SEVERE && QUIT_ON_SEVERE) {
+        if (level == Level.SEVERE) {
             flushAll();
             System.exit(1);
         }
@@ -140,21 +139,5 @@ public class NeguraLog {
 
     public static void severe(Throwable thr, String format, Object... args) {
         log(Level.SEVERE, String.format(format, args), thr);
-    }
-
-    /**
-     * Returns whether or not the program will exit on receiving a severe
-     * logging message; at startup it is true.
-     */
-    public static boolean getQuitOnSevere() {
-        return QUIT_ON_SEVERE;
-    }
-
-    /**
-     * Sets whether or not the program should exit on receiving a severe
-     * logging message; at startup it is true.
-     */
-    public static void setQuitOnSevere(boolean quitOnSevere) {
-        NeguraLog.QUIT_ON_SEVERE = quitOnSevere;
     }
 }

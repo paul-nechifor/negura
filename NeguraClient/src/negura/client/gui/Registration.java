@@ -6,9 +6,10 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.KeyPair;
 import java.security.interfaces.RSAPublicKey;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import negura.client.ClientConfigManager;
 import negura.client.ClientConfigManager.Builder;
-import negura.client.Main;
 import negura.client.I18n;
 import negura.common.data.RsaKeyPair;
 import negura.common.data.ServerInfo;
@@ -232,13 +233,13 @@ public class Registration {
         }
 
         // Creating the directories if they need to be created.
-        File blockDir = new File(new File(Os.getUserDataDir(),
-                I18n.get("applicationShortName")), "blocks");
+        File dataDir = new File(Os.getUserDataDir(),
+                I18n.get("applicationShortName"));
         File configFileDir = new File(Os.getUserConfigDir(),
                 I18n.get("applicationShortName"));
-        if (!blockDir.exists() && !blockDir.mkdirs()) {
-            MsgBox.error(shell, I18n.format("failedBlockDir",
-                    blockDir.getAbsoluteFile()));
+        if (!dataDir.exists() && !dataDir.mkdirs()) {
+            MsgBox.error(shell, I18n.format("failedDataDir",
+                    dataDir.getAbsoluteFile()));
             shell.dispose();
             return;
         }
@@ -285,13 +286,21 @@ public class Registration {
         
         int uid = regResp.get("uid").getAsInt();
 
-        ClientConfigManager cm = new Builder(configFile)
+        Builder builder = new Builder(configFile)
                 .serverAddress(serverAddress)
                 .storedBlocks(serverInfo.minimumBlocks).serverInfo(serverInfo)
-                .blockDir(blockDir).userId(uid).servicePort(servicePort)
+                .dataDir(dataDir).userId(uid).servicePort(servicePort)
                 .ftpPort(ftpPort).keyPair(rsaKeyPair).threadPoolOptions(
-                "core-pool-size=0;maximum-pool-size=15;keep-alive-time=30")
-                .build();
+                "core-pool-size=0;maximum-pool-size=15;keep-alive-time=30");
+
+        ClientConfigManager cm = null;
+        try {
+            cm = builder.build();
+        } catch (IOException ex) {
+            MsgBox.error(shell, "Failed to build configuration.");
+            shell.dispose();
+            return;
+        }
 
         try {
             cm.save();
@@ -328,13 +337,6 @@ public class Registration {
         // Creating the config file path.
         File configFile = new File(dir, "config.json");
 
-        // Creating the block dir.
-        File blockDir = new File(dir, "blocks");
-        String blockDirPath = blockDir.getAbsolutePath();
-        if (!blockDir.mkdir()) {
-            NeguraLog.severe("Couldn't create block dir '%s'.", blockDirPath);
-        }
-
         JsonObject serverInfoRequest = Comm.newMessage("server-info");
         ServerInfo serverInfo = null;
         InetSocketAddress serverAddress = new InetSocketAddress(serverIp,
@@ -358,7 +360,7 @@ public class Registration {
             storedBlocks = 700;
 
         Builder builder = new Builder(configFile).serverAddress(serverAddress)
-                .serverInfo(serverInfo).blockDir(blockDir).servicePort(port)
+                .serverInfo(serverInfo).dataDir(dir).servicePort(port)
                 .storedBlocks(storedBlocks).threadPoolOptions(
                 "core-pool-size=0;maximum-pool-size=15;keep-alive-time=30")
                 .ftpPort(2220 + code).keyPair(rsaKeyPair);

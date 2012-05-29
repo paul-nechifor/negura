@@ -62,10 +62,6 @@ public class ServerConfigManager {
         return builder.port;
     }
 
-    public int getMinimumBlocks() {
-        return builder.serverInfo.minimumBlocks;
-    }
-
     public ServerInfo getServerInfo() {
         return builder.serverInfo;
     }
@@ -80,5 +76,9 @@ public class ServerConfigManager {
 
     public void setFirstRun(boolean firstRun) {
         builder.firstRun = firstRun;
+    }
+
+    public int getVirtualDiskBlocks() {
+        return builder.virtualDiskBlocks;
     }
 }

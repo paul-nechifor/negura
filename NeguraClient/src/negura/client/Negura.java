@@ -13,54 +13,71 @@
  *  - MigLayout pentru SWT pentru a descrie interfata mai concis.
  */
 
+/*
+ * TODO: I should support both IPv4 and IPv6 addresses.
+ *
+ * TODO: A user shouldn't be able to choose to store more blocks than there are
+ * in the file system.
+ *
+ * TODO: When Negura starts I should perform a check to see if all the blocks
+ * exist etc.
+ */
+
 package negura.client;
 
+import java.security.NoSuchAlgorithmException;
 import negura.client.net.StateMaintainer;
 import negura.client.net.ClientRequestHandler;
 import negura.client.fs.NeguraFile;
 import negura.client.fs.NeguraFileInputStream;
-import com.google.gson.JsonArray;
-import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.net.InetSocketAddress;
 import java.security.MessageDigest;
-import java.util.ArrayList;
-import java.util.Date;
 import javax.xml.bind.DatatypeConverter;
 import negura.client.ftp.NeguraFtpServer;
 import negura.client.gui.TrayGui;
+import negura.common.data.Block;
+import negura.common.data.BlockList;
+import negura.common.data.Operation;
+import negura.common.json.Json;
 import negura.common.util.Comm;
 import negura.common.net.RequestServer;
 import negura.common.util.NeguraLog;
+import negura.common.util.Os;
 
 public class Negura {
-    private ClientConfigManager cm;
-    private InetSocketAddress serverAddress;
-    private ClientRequestHandler requestHandler;
-    private RequestServer requestServer;
-    private StateMaintainer stateMaintainer;
+    private final ClientConfigManager cm;
+    private final RequestServer requestServer;
+    private final StateMaintainer stateMaintainer;
+    private final NeguraFtpServer ftpServer;
+
+    // This is special. It has to be started in it's own thread.
     private TrayGui trayGui;
-    private NeguraFtpServer ftpServer;
 
     public Negura(File configFile) {
+        // Loading the configuration manager.
+        ClientConfigManager manager = null;
         try {
-            cm = new ClientConfigManager(configFile);
+            manager = new ClientConfigManager(configFile);
         } catch (IOException ex) {
             NeguraLog.severe(ex);
         }
+        cm = manager;
 
-        serverAddress = cm.getServerSocketAddress();
-
-        requestHandler = new ClientRequestHandler(this, cm);
-        requestServer = new RequestServer(cm.getPort(),
-                cm.getThreadPoolOptions(), requestHandler);
+        ClientRequestHandler handler =new ClientRequestHandler(this, cm);
+        requestServer = new RequestServer(cm.getServicePort(),
+                cm.getThreadPoolOptions(), handler);
         stateMaintainer = new StateMaintainer(cm);
         ftpServer = new NeguraFtpServer(cm);
     }
+
+
+
+
+    //////////////////////////////////////////////////////////////////////////
 
     public void start() {
         // Starting the tray GUI in it's own thread.
@@ -72,8 +89,6 @@ public class Negura {
             }
         }).start();
 
-        startCheck();
-
         requestServer.startInNewThread();
         stateMaintainer.startInNewThread();
 
@@ -81,8 +96,12 @@ public class Negura {
             Thread.sleep(9999);
         } catch (InterruptedException ex) { }
 
-        if (cm.getPort() == 20000) {
-            addDir(new File("/home/p/tmp/negura"), "");
+        if (cm.getServicePort() == 20000) {
+            try {
+                addDir(new File("/home/p/tmp/negura"), "");
+            } catch (Exception ex) {
+                NeguraLog.severe(ex);
+            }
 
             try {
                 Thread.sleep(6000);
@@ -90,7 +109,7 @@ public class Negura {
 
             try {
                 JsonObject mesg = Comm.newMessage("trigger-fs-update");
-                Comm.readMessage(serverAddress, mesg);
+                Comm.readMessage(cm.getServerAddress(), mesg);
             } catch (IOException ex) {
                 NeguraLog.severe(ex);
             }
@@ -110,15 +129,6 @@ public class Negura {
         }
         // TODO: see why not all the threads are stopping. Is it the FTP server?
         System.exit(0);
-    }
-
-    // Checks to see if everythins is in order and tries to repair if possible.
-    public void startCheck() {
-        File blockDir = cm.getBlockDir();
-        if (!blockDir.exists())
-            blockDir.mkdir();
-
-        // TODO: check if all the blocks are present.
     }
 
     public NeguraFtpServer getFtpServer() {
@@ -145,7 +155,8 @@ public class Negura {
         out.close();
     }
 
-    public void addDir(File dir, String storePath) {
+    public void addDir(File dir, String storePath)
+            throws NoSuchAlgorithmException, IOException {
         for (File f : dir.listFiles()) {
             if (f.isDirectory())
                 addDir(f, storePath + "/" + f.getName());
@@ -154,71 +165,77 @@ public class Negura {
         }
     }
 
-    public void addFile(File file, String storePath) {
+    public void addFile(File file, String storePath)
+            throws NoSuchAlgorithmException, IOException {
         NeguraLog.info("Adding file '%s' as '%s'.", file.getAbsoluteFile(),
                 storePath);
-        
-        try {
-            int blockSize = cm.getServerInfoBlockSize();
-            long fileSize = file.length();
-            int nrBlocks = (int) Math.ceil((double) fileSize / blockSize);
 
-            JsonObject req = Comm.newMessage("allocate-operation");
-            req.addProperty("number-of-blocks", nrBlocks);
+        // The blocks will be saved here by block hash and then moved to the
+        // temp block dir.
+        File dirForTempBlocks = Os.createRandomFile(cm.getDataDir(),
+                Os.FileType.DIR, null, null);
 
-            JsonObject respIds = Comm.readMessage(serverAddress, req);
+        BlockList blockList = cm.getBlockList();
+        int blockSize = cm.getBlockSize();
+        long fileSize = file.length();
+        int nrBlocks = (int) Math.ceil((double) fileSize / blockSize);
+        Block[] blocks = new Block[nrBlocks];
+        File[] blockFiles = new File[nrBlocks];
 
-            req = Comm.newMessage("add-operation");
-            req.addProperty("uid", cm.getUserId());
-            JsonObject op = new JsonObject();
-            req.add("op", op);
-            op.addProperty("type", "add");
-            op.add("id", respIds.get("opid"));
-            op.addProperty("date", new Date().getTime() / 1000);
-            op.addProperty("path", storePath);
-            op.addProperty("size", fileSize);
-            req.add("op", op);
-            JsonArray blocks = new JsonArray();
-            op.add("blocks", blocks);
+        FileInputStream in = new FileInputStream(file);
+        MessageDigest fileHash = MessageDigest.getInstance("SHA-256");
+        MessageDigest blockHash = MessageDigest.getInstance("SHA-256");
+        byte[] block = new byte[blockSize];
+        int blockReadSize;
 
-            FileInputStream in = new FileInputStream(file);
-            MessageDigest fileHash = MessageDigest.getInstance("SHA-256");
-            byte[] block = new byte[blockSize];
-            int blockReadSize;
+        for (int i = 0; i < blocks.length; i++) {
+            // Reading the block.
+            blockReadSize = in.read(block, 0, blockSize);
 
-            ArrayList<Integer> newBlocks = new ArrayList<Integer>();
+            // Getting the block hash.
+            blockHash.update(block, 0, blockReadSize);
+            String hash = DatatypeConverter.printHexBinary(blockHash.digest());
 
-            for (JsonElement idElem : respIds.getAsJsonArray("block-ids")) {
-                int id = idElem.getAsInt();
+            // Saving the file.
+            blockFiles[i] = new File(dirForTempBlocks, hash);
+            FileOutputStream out = new FileOutputStream(blockFiles[i]);
+            out.write(block, 0, blockReadSize);
+            out.close();
 
-                // Reading the block.
-                blockReadSize = in.read(block, 0, blockSize);
+            // Update file hash.
+            fileHash.update(block, 0, blockReadSize);
 
-                // Writing block to the block file.
-                String hash = cm.saveBlock(id, block, blockReadSize);
+            blocks[i] = new Block(0, hash);
+        }
 
-                // Update file hash.
-                fileHash.update(block, 0, blockReadSize);
+        in.close();
 
-                // Add this block to the list of blocks.
-                JsonObject b = new JsonObject();
-                b.addProperty("id", id);
-                b.addProperty("hash", hash);
-                blocks.add(b);
+        Operation op = new Operation();
+        op.type = "add";
+        op.path = storePath;
+        op.size = fileSize;
+        op.blocks = blocks;
+        op.hash = DatatypeConverter.printHexBinary(fileHash.digest());
+        op.signature = "my signature. this will be changed by the server";
 
-                newBlocks.add(id);
-            }
+        JsonObject mesg = Comm.newMessage("add-operation");
+        mesg.add("operation", Json.toJsonElement(op));
+        JsonObject resp = Comm.readMessage(cm.getServerAddress(), mesg);
+        int firstBlockId = resp.get("first-block-id").getAsInt();
 
-            in.close();
+        // Moving the blocks to the temp dir and registering their presence.
+        int blockId = firstBlockId;
+        for (int i = 0; i < blocks.length; i++) {
+            blockFiles[i].renameTo(
+                    blockList.getFileToSaveTempBlockTo(blockId));
+            blockList.haveTempBlock(blockId);
+            blockId++;
+        }
 
-            op.addProperty("hash",
-                    DatatypeConverter.printHexBinary(fileHash.digest()));
-
-            Comm.readMessage(serverAddress, req);
-
-            cm.pushBlocks(newBlocks, false);
-        } catch (Exception ex) {
-            NeguraLog.severe(ex, "Error adding file.");
+        // Removing the temp-temp dir.
+        if (!dirForTempBlocks.delete()) {
+            NeguraLog.warning("Failed to delete '%s'.",
+                    dirForTempBlocks.getAbsoluteFile());
         }
     }
 }

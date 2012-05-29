@@ -3,7 +3,6 @@ package negura.server.net;
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.google.gson.JsonPrimitive;
 import java.io.IOException;
 import java.net.Socket;
@@ -12,10 +11,11 @@ import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
+import negura.common.ex.NeguraEx;
 import negura.common.util.Comm;
 import negura.common.net.RequestHandler;
 import negura.common.data.Operation;
+import negura.common.ex.NeguraError;
 import negura.common.json.Json;
 import negura.common.util.NeguraLog;
 import negura.server.DataManager;
@@ -47,8 +47,6 @@ public class ServerRequestHandler implements RequestHandler {
                 handle_server_info(socket, message);
             } else if (request.equals("registration")) {
                 handle_registration(socket, message);
-            } else if (request.equals("allocate-operation")) {
-                handle_allocate_operation(socket, message);
             } else if (request.equals("add-operation")) {
                 handle_add_operation(socket, message);
             } else if (request.equals("peers-for-blocks")) {
@@ -59,6 +57,8 @@ public class ServerRequestHandler implements RequestHandler {
                 handle_get_block_list(socket, message);
             } else if (request.equals("filesystem-state")) {
                 handle_filesystem_state(socket, message);
+            } else if (request.equals("hashes-for-blocks")) {
+                handle_hashes_for_blocks(socket, message);
             } else if (request.equals("trigger-fs-update")) {
                 handle_trigger_fs_update(socket, message);
             } else {
@@ -80,14 +80,9 @@ public class ServerRequestHandler implements RequestHandler {
     }
 
     private void handle_server_info(Socket socket, JsonObject message) {
-        // TODO: This shouldn't be so convoluted.
-        JsonObject serverInfo = new JsonParser().parse(Json.toString(
-                cm.getServerInfo())).getAsJsonObject();
-
-        for (Entry<String, JsonElement> e : Comm.newMessage().entrySet()) {
-            serverInfo.add(e.getKey(), e.getValue());
-        }
-
+        JsonObject serverInfo = Json.toJsonElement(cm.getServerInfo())
+                .getAsJsonObject();
+        Json.extend(serverInfo, Comm.newMessage());
         Comm.writeMessage(socket, serverInfo);
     }
 
@@ -98,8 +93,14 @@ public class ServerRequestHandler implements RequestHandler {
         int numberOfBlocks = message.get("number-of-blocks").getAsInt();
         String publicKey = message.get("public-key").getAsString();
 
-        if (numberOfBlocks < cm.getMinimumBlocks()) {
+        if (numberOfBlocks < cm.getServerInfo().minimumBlocks) {
             registrationError(socket, "Too few blocks.");
+            return;
+        }
+
+        if (numberOfBlocks > cm.getVirtualDiskBlocks()) {
+            registrationError(socket, "You can't store more blocks than there"
+                    + "are in the file system.");
             return;
         }
 
@@ -128,53 +129,27 @@ public class ServerRequestHandler implements RequestHandler {
         Comm.writeMessage(socket, message);
         socket.close();
     }
-    
-    // TODO: remove operation allocation and do it directly.
-    private void handle_allocate_operation(Socket socket, JsonObject message)
-            throws SQLException {
-        int numberOfBlocks = message.get("number-of-blocks").getAsInt();
-        int firstBlock = dataManager.singleRowResult(
-                "SELECT nextval('blockSeq');");
-        int last = firstBlock + numberOfBlocks - 1;
-        // Advancing the block sequence.
-        dataManager.returnsRows("SELECT setval('blockSeq', " + last + ", true);");
-        int opid = dataManager.singleRowResult("SELECT nextval('operationSeq');");
-
-        JsonArray blocks = new JsonArray();
-        for (int i = firstBlock; i <= last; i++) {
-            blocks.add(new JsonPrimitive(i));
-        }
-
-        JsonObject resp = Comm.newMessage();
-        resp.addProperty("opid", opid);
-        resp.add("block-ids", blocks);
-
-        Comm.writeMessage(socket, resp);
-    }
 
     private void handle_add_operation(Socket socket, JsonObject message)
-            throws IOException {
-        // For now, there is no message to send back.
-        Comm.writeMessage(socket, new JsonObject());
-        socket.close();
-
-        Operation op = Operation.fromJson(message.getAsJsonObject("op"));
+            throws IOException, SQLException, NeguraEx {
+        Operation op = Json.fromJsonObject(
+                message.get("operation").getAsJsonObject(), Operation.class);
         op.signature = "generated signature";
         op.date = (int) (System.currentTimeMillis() / 1000);
-        int userId = message.get("uid").getAsInt();
-        List<Integer> users = null;
+        int creatorId = message.get("uid").getAsInt();
 
-        try {
-            users = dataManager.insertOperationAndAllocate(userId, op);
-        } catch (SQLException ex) {
-            NeguraLog.severe(ex);
-        }
+        List<Integer> allocatedUsers = new ArrayList<Integer>();
+        int firstBlockId = dataManager.insertOperationAndAllocate(op, creatorId,
+                allocatedUsers);
 
-        announcer.addNewBlocks(users);
-        announcer.addNewOperation(op.id);
+        JsonObject resp = Comm.newMessage();
+        resp.addProperty("first-block-id", firstBlockId);
+        Comm.writeMessage(socket, resp);
+        socket.close();
+
+        announcer.addNewAllocatedUsers(allocatedUsers);
     }
 
-    // TODO consider the case where there are no peers for any of the blocks.
     private void handle_peers_for_blocks(Socket socket, JsonObject message)
             throws SQLException {
         ArrayList<Integer> blocks = new ArrayList<Integer>();
@@ -182,33 +157,43 @@ public class ServerRequestHandler implements RequestHandler {
             blocks.add(e.getAsInt());
         }
 
-        Map<Integer, ArrayList<String>> peers =
-                dataManager.peersForBlocks(blocks);
-
-        JsonObject ret = Comm.newMessage();
-        JsonArray retList = new JsonArray();
-        JsonObject peersJ;
-        JsonArray list;
-        ArrayList<String> peerList;
-        for (Integer b : blocks) {
-            peersJ = new JsonObject();
-            peersJ.addProperty("id", b);
-            list = new JsonArray();
-            peerList = peers.get(b);
-            if (peerList == null) {
-                // Should add this in errors.
-                // TODO: got this error before.
-                NeguraLog.warning("Received non existant block");
-                continue;
-            }
-            for (String a : peerList) {
-                list.add(new JsonPrimitive(a));
-            }
-            peersJ.add("peers", list);
-            retList.add(peersJ);
+        if (blocks.isEmpty()) {
+            NeguraLog.warning("The list is empty.");
+            return;
         }
 
-        ret.add("blocks", retList);
+        Map<Integer, ArrayList<String>> peers =
+                dataManager.getPeersForBlocks(blocks);
+
+        if (peers.isEmpty()) {
+            NeguraLog.warning("No peers for entire request %s.", blocks);
+        }
+
+        JsonObject ret = Comm.newMessage();
+        JsonObject peersJ = new JsonObject();
+        JsonArray array;
+        ArrayList<String> addresses;
+
+        for (Integer blockId : blocks) {
+            array = new JsonArray();
+            addresses = peers.get(blockId);
+
+            if (addresses == null) {
+                NeguraLog.warning("No peers were found for block %d.", blockId);
+                continue;
+            }
+
+            if (addresses.isEmpty()) {
+                throw new NeguraError("Cannon happen.");
+            }
+
+            for (String address : addresses)
+                array.add(new JsonPrimitive(address));
+
+            peersJ.add(blockId.toString(), array);
+        }
+
+        ret.add("blocks", peersJ);
 
         Comm.writeMessage(socket, ret);
     }
@@ -219,7 +204,7 @@ public class ServerRequestHandler implements RequestHandler {
         socket.close();
 
         int uid = message.get("uid").getAsInt();
-        LinkedList<Integer> list = new LinkedList<Integer>();
+        List<Integer> list = new ArrayList<Integer>();
         for (JsonElement e : message.getAsJsonArray("blocks")) {
             list.add(e.getAsInt());
         }
@@ -230,12 +215,14 @@ public class ServerRequestHandler implements RequestHandler {
     private void handle_get_block_list(Socket socket, JsonObject message)
             throws SQLException {
         int uid = message.get("uid").getAsInt();
-        List<Integer> list = dataManager.getBlockList(uid);
+        int after = message.get("after").getAsInt();
+        List<Integer> list = dataManager.getBlockListAfter(uid, after);
 
         JsonArray blocks = new JsonArray();
         for (Integer i : list) {
             blocks.add(new JsonPrimitive(i));
         }
+        
         JsonObject resp = Comm.newMessage();
         resp.add("blocks", blocks);
         Comm.writeMessage(socket, resp);
@@ -244,21 +231,26 @@ public class ServerRequestHandler implements RequestHandler {
     private void handle_filesystem_state(Socket socket, JsonObject message)
             throws SQLException {
         int after = message.get("after").getAsInt();
-        List<Operation> list = dataManager.operationsAfter(after);
+        List<Operation> list = dataManager.getOperationsAfter(after);
 
-        JsonObject resp = Comm.newMessage();
         JsonArray ops = new JsonArray();
         for (Operation op : list) {
-            ops.add(op.toJson());
+            ops.add(Json.toJsonElement(op));
         }
+
+        JsonObject resp = Comm.newMessage();
         resp.add("operations", ops);
         Comm.writeMessage(socket, resp);
+    }
+
+    private void handle_hashes_for_blocks(Socket socket, JsonObject message) {
+        // ...
     }
 
     private void handle_trigger_fs_update(Socket socket, JsonObject message)
             throws IOException {
         Comm.writeMessage(socket, new JsonObject());
         socket.close();
-        announcer.triggerSendNewOps();
+        announcer.triggerSendNewOperations();
     }
 }

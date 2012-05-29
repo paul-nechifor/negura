@@ -1,6 +1,5 @@
 package negura.client.net;
 
-import negura.client.fs.NeguraFsView;
 import com.google.gson.JsonObject;
 import java.io.BufferedOutputStream;
 import java.io.DataOutputStream;
@@ -8,6 +7,7 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.Socket;
 import java.net.UnknownHostException;
 import negura.client.ClientConfigManager;
@@ -22,14 +22,14 @@ import negura.common.util.Util;
  * @author Paul Nechifor
  */
 public class ClientRequestHandler implements RequestHandler {
-    private Negura negura;
-    private ClientConfigManager cm;
-    private NeguraFsView fsView;
+    private final ClientConfigManager cm;
+    private final byte[] buffer;
+    private final Negura negura;
 
     public ClientRequestHandler(Negura negura, ClientConfigManager cm) {
         this.negura = negura;
         this.cm = cm;
-        this.fsView = cm.getFsView();
+        this.buffer = new byte[cm.getBlockSize()];
     }
 
     public void handle(Socket socket) {
@@ -75,11 +75,13 @@ public class ClientRequestHandler implements RequestHandler {
 
     private void handle_up_block(Socket socket, JsonObject message)
             throws IOException {
-        File blockLocation = cm.fileForBlockId(
-                message.get("block-id").getAsInt());
-        BufferedOutputStream out = new BufferedOutputStream(
-                socket.getOutputStream());
-        DataOutputStream dataOut = new DataOutputStream(out);
+        int blockId = message.get("block-id").getAsInt();
+        File blockLocation = cm.getBlockList().getBlockFileIfExists(blockId);
+
+        OutputStream os = socket.getOutputStream();
+        BufferedOutputStream bos = new BufferedOutputStream(os);
+        DataOutputStream dos = new DataOutputStream(bos);
+
         int offset = 0;
         int length = -1;
 
@@ -91,20 +93,21 @@ public class ClientRequestHandler implements RequestHandler {
         }
 
         if (blockLocation == null) {
-            dataOut.writeInt(Comm.BLOCK_NOT_FOUND);
-            NeguraLog.warning("Block not found.");
-            dataOut.flush();
+            dos.writeInt(Comm.BLOCK_NOT_FOUND);
+            NeguraLog.warning("Requested block %d not found.", blockId);
+            dos.flush();
             return;
         }
 
         int realLength = (int) blockLocation.length() - offset;
         if (length > realLength) {
-            dataOut.writeInt(Comm.BLOCK_INVALID_LENGTH);
-            NeguraLog.warning("Block invalid length.");
-            dataOut.flush();
+            dos.writeInt(Comm.BLOCK_INVALID_LENGTH);
+            NeguraLog.warning("Invalid length %d > %d.", length, realLength);
+            dos.flush();
             return;
         }
 
+        // If length is -1 then all was requested.
         if (length == -1) {
             length = realLength;
         }
@@ -113,14 +116,14 @@ public class ClientRequestHandler implements RequestHandler {
         if (offset > 0) {
             in.skip(offset);
         }
-        byte[] buffer = new byte[cm.getServerInfoBlockSize()];
+
         int read = Util.readBytes(buffer, 0, length, in);
 
         try {
-            dataOut.writeInt(Comm.BLOCK_FOUND);
-            dataOut.writeInt(read);
-            dataOut.flush();
-            out.write(buffer, 0, read);
+            dos.writeInt(Comm.BLOCK_FOUND);
+            dos.writeInt(read);
+            dos.flush();
+            bos.write(buffer, 0, read);
         } catch (IOException ex) {
             NeguraLog.warning(ex);
         }
