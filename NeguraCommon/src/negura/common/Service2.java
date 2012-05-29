@@ -13,11 +13,13 @@ public abstract class Service2 {
         if (started) {
             throw new NeguraError("Already started.");
         }
+        started = true;
     }
 
     public void stop() {
         if (!started) {
             throw new NeguraError("Hasn't been started.");
         }
+        started = false;
     }
 }

@@ -6,9 +6,9 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import java.io.IOException;
 import java.net.Socket;
+import java.sql.BatchUpdateException;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import negura.common.ex.NeguraEx;
@@ -66,6 +66,8 @@ public class ServerRequestHandler implements RequestHandler {
                 Comm.terminateWithError(socket, error);
                 NeguraLog.warning(error);
             }
+        } catch (BatchUpdateException ex) {
+            NeguraLog.severe(ex.getNextException());
         } catch (Exception ex) {
             NeguraLog.severe(ex);
         }

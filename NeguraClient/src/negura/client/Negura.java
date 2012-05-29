@@ -21,6 +21,17 @@
  *
  * TODO: When Negura starts I should perform a check to see if all the blocks
  * exist etc.
+ *
+ * TODO: Put a handler for the exceptions in different threads.
+ *
+ * TODO: User joins in DataManager.
+ *
+ * TODO: wrap everything in try-catch in NeguraFileInputStream to catch that
+ * ugly bug.
+ *
+ * TODO: Enable assertions.
+ *
+ * TODO: Learn about NIO and use it.
  */
 
 package negura.client;
@@ -47,6 +58,7 @@ import negura.common.util.Comm;
 import negura.common.net.RequestServer;
 import negura.common.util.NeguraLog;
 import negura.common.util.Os;
+import negura.common.util.Util;
 
 public class Negura {
     private final ClientConfigManager cm;
@@ -146,13 +158,7 @@ public class Negura {
         FileOutputStream out = new FileOutputStream(output);
         NeguraFileInputStream in = new NeguraFileInputStream(f, 0);
 
-        byte[] buf = new byte[8192 * 8];
-        int read;
-        while ((read = in.read(buf)) >= 0)
-            out.write(buf, 0, read);
-
-        in.close();
-        out.close();
+        Util.copyStream(in, out, new byte[8192 * 8]);
     }
 
     public void addDir(File dir, String storePath)
@@ -219,15 +225,24 @@ public class Negura {
         op.signature = "my signature. this will be changed by the server";
 
         JsonObject mesg = Comm.newMessage("add-operation");
+        mesg.addProperty("uid", cm.getUserId());
         mesg.add("operation", Json.toJsonElement(op));
         JsonObject resp = Comm.readMessage(cm.getServerAddress(), mesg);
         int firstBlockId = resp.get("first-block-id").getAsInt();
 
         // Moving the blocks to the temp dir and registering their presence.
         int blockId = firstBlockId;
+        File moveTo;
+        boolean moved;
         for (int i = 0; i < blocks.length; i++) {
-            blockFiles[i].renameTo(
-                    blockList.getFileToSaveTempBlockTo(blockId));
+            moveTo = blockList.getFileToSaveTempBlockTo(blockId);
+            moved = blockFiles[i].renameTo(moveTo);
+            
+            if (!moved) {
+                NeguraLog.severe("Failed to move '%s' to '%s'.", blockFiles[i],
+                        moveTo);
+            }
+
             blockList.haveTempBlock(blockId);
             blockId++;
         }

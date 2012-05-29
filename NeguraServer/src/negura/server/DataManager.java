@@ -2,6 +2,7 @@ package negura.server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -14,10 +15,13 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 import negura.common.ex.NeguraEx;
 import negura.common.util.Util;
 import negura.common.data.Block;
 import negura.common.data.Operation;
+import negura.common.ex.NeguraError;
 import negura.common.util.NeguraLog;
 import org.apache.commons.dbcp.BasicDataSource;
 
@@ -88,14 +92,10 @@ public class DataManager {
                 String command = commands[i].replaceAll("\\s+", " ").trim();
                 if (command.equals(";"))
                     continue;
-                
-                try {
-                    s.execute(command);
-                } catch (SQLException ex) {
-                    NeguraLog.severe(ex, "Couldn't execute '%s'.", command);
-                }
-            }
 
+                s.addBatch(command);
+            }
+            s.executeBatch();
             NeguraLog.info("Finished creating tables.");
         } finally {
             closeQuietly(s);
@@ -171,8 +171,11 @@ public class DataManager {
 
         try {
             c = connectionPool.getConnection();
-            ps = c.prepareStatement("SELECT '1' FROM users " +
-                    "WHERE ip = ? AND port = ?");
+            ps = c.prepareStatement(
+                "SELECT '1' " +
+                "FROM users " +
+                "WHERE ip = ? AND port = ?"
+            );
             ps.setString(1, ipAddress);
             ps.setInt(2, port);
             ResultSet results = ps.executeQuery();
@@ -198,7 +201,6 @@ public class DataManager {
             String publicKey) throws SQLException {
         Connection c = null;
         PreparedStatement ps = null;
-        Statement s = null;
 
         try {
             c = connectionPool.getConnection();
@@ -207,8 +209,10 @@ public class DataManager {
             int userId = (int)(long)(Long)singleValueResult(c,
                     "SELECT nextval('user_seq')");
             
-            ps = c.prepareStatement("INSERT INTO users " +
-                    "VALUES (?, ?, ?, ?, ?, ?)");
+            ps = c.prepareStatement(
+                "INSERT INTO users " +
+                "VALUES (?, ?, ?, ?, ?, ?)"
+            );
             ps.setInt(1, userId);
             ps.setString(2, ipAddress);
             ps.setInt(3, port);
@@ -218,25 +222,26 @@ public class DataManager {
             ps.executeUpdate();
             ps.close();
             
-            s = c.createStatement();
-            String sqlText = String.format(
-                    "INSERT INTO allocated " +
-                        "SELECT %d, bid " +
-                        "FROM ( " +
-                            "SELECT bid, count(*) AS bcount " +
-                            "FROM blocks " +
-                            "GROUP BY bid " +
-                        ") c " +
-                        "ORDER BY bcount, random() " +
-                        "LIMIT %d ",
-                    userId, numberOfBlocks);
-            s.executeUpdate(sqlText);
+            ps = c.prepareStatement(
+                "INSERT INTO allocated " +
+                    "SELECT ?, bid " +
+                    "FROM (" +
+                        "SELECT b.bid, count(a.bid) as bcount " +
+                        "FROM blocks b " +
+                        "LEFT OUTER JOIN allocated a ON a.bid = b.bid " +
+                        "GROUP BY b.bid" +
+                    ") c " +
+                    "ORDER BY bcount, random() " +
+                    "LIMIT ? "
+            );
+            ps.setInt(1, userId);
+            ps.setInt(2, numberOfBlocks);
+            ps.executeUpdate();
 
             return userId;
         } finally {
             // ps might will normally be closed twice. This is here for safaty.
             closeQuietly(ps);
-            closeQuietly(s);
             closeQuietly(c);
         }
     }
@@ -274,24 +279,26 @@ public class DataManager {
                         "there are %d left.", op.blocks.length, freeBlocks);
             }
 
-            int firstFreeBlock = Integer.parseInt(getValue(c,
+            // Setting the block IDs for the operation.
+            op.firstbid = Integer.parseInt(getValue(c,
                     "first_free_block"));
+            op.lastbid = op.firstbid + op.blocks.length - 1;
 
             // Updating the settings.
             setValues(c,
                 "free_blocks",
                     Integer.toString(freeBlocks - op.blocks.length),
                 "first_free_block",
-                    Integer.toString(firstFreeBlock + op.blocks.length)
+                    Integer.toString(op.lastbid + 1)
             );
 
             // Getting the ID for the operation.
             op.oid = (int)(long)(Long)singleValueResult(c,
-                    "SELECT nextval('operationSeq')");
+                    "SELECT nextval('operation_seq')");
 
             // Inserting the operation.
             ps = c.prepareStatement("INSERT INTO "
-                + "operations VALUES (?, ?, ?, ?, ?, ?, ?, ?);");
+                + "operations VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
             ps.setInt(1, op.oid);
             ps.setString(2, op.path);
             ps.setString(4, op.signature);
@@ -302,14 +309,20 @@ public class DataManager {
                 ps.setNull(3, Types.VARCHAR);
                 ps.setLong(6, op.size);
                 ps.setString(7, op.hash);
+                ps.setInt(9, op.firstbid);
+                ps.setInt(10, op.lastbid);
             } else if (op.type.equals("move")) {
                 ps.setString(3, op.newPath);
                 ps.setNull(6, Types.BIGINT);
                 ps.setNull(7, Types.VARCHAR);
+                ps.setNull(9, Types.INTEGER);
+                ps.setNull(10, Types.INTEGER);
             } else if (op.type.equals("delete")) {
                 ps.setNull(3, Types.VARCHAR);
                 ps.setNull(6, Types.BIGINT);
                 ps.setNull(7, Types.VARCHAR);
+                ps.setNull(9, Types.INTEGER);
+                ps.setNull(10, Types.INTEGER);
             } else {
                 throw new AssertionError("No such operation.");
             }
@@ -325,7 +338,7 @@ public class DataManager {
 
             for (int i = 0; i < op.blocks.length; i++) {
                 ps.setString(1, op.blocks[i].hash);
-                ps.setInt(2, firstFreeBlock + i);
+                ps.setInt(2, op.firstbid + i);
                 ps.addBatch();
             }
 
@@ -336,10 +349,10 @@ public class DataManager {
             ps = c.prepareStatement(
                 "SELECT uid, bid " +
                 "FROM allocated " +
-                "WHERE bid >= ? AND bid < ?"
+                "WHERE bid >= ? AND bid <= ?"
             );
-            ps.setInt(1, firstFreeBlock);
-            ps.setInt(2, firstFreeBlock + op.blocks.length);
+            ps.setInt(1, op.firstbid);
+            ps.setInt(2, op.lastbid);
             ResultSet results = ps.executeQuery();
 
             HashMap<Integer, ArrayList<Integer>> forUser =
@@ -350,14 +363,17 @@ public class DataManager {
             while (results.next()) {
                 uid = results.getInt(1);
                 bid = results.getInt(2);
-                if (forUser.containsKey(uid)) {
-                    forUser.get(uid).add(bid);
-                } else {
+
+                newList = forUser.get(uid);
+
+                if (newList == null) {
                     newList = new ArrayList<Integer>();
-                    newList.add(uid);
                     forUser.put(uid, newList);
                 }
+
+                newList.add(bid);
             }
+
             results.close();
             ps.close();
 
@@ -408,7 +424,7 @@ public class DataManager {
             ps = c.prepareStatement(
                 "UPDATE users " +
                 "SET newindex = ? " +
-                "WHERE id = ?"
+                "WHERE uid = ?"
             );
 
             int newIndexVal;
@@ -435,17 +451,21 @@ public class DataManager {
             );
             for (int i = 0; i < op.blocks.length; i++) {
                 ps.setInt(1, creatorId);
-                ps.setInt(2, firstFreeBlock + i);
+                ps.setInt(2, op.firstbid + i);
                 ps.setInt(3, deleteTime);
                 ps.addBatch();
             }
             ps.executeBatch();
             ps.close();
 
+            // Ending transaction.
+            c.commit();
+            c.setAutoCommit(true);
+
             // "Returning" the users who had their lists modified.
             allocatedUsers.addAll(forUser.keySet());
 
-            return firstFreeBlock;
+            return op.firstbid;
         } catch (SQLException ex) {
             c.rollback();
             throw ex;
@@ -460,14 +480,67 @@ public class DataManager {
     }
 
     /**
+     * Sets the block specified as completed for the user.
+     * @param userId        The user which has completed the blocks.
+     * @param blockIds      The list of block IDs.
+     * @throws SQLException
+     */
+    public void insertCompleted(int userId, Collection<Integer> blockIds)
+            throws SQLException {
+        Connection c = null;
+        PreparedStatement ps = null;
+
+        try {
+            c = connectionPool.getConnection();
+            ps = c.prepareStatement(
+                "INSERT INTO completed " +
+                "VALUES (?, ?)"
+            );
+
+            for (Integer blockId : blockIds) {
+                ps.setInt(1, userId);
+                ps.setInt(2, blockId);
+                ps.addBatch();
+            }
+
+            ps.executeBatch();
+        } finally {
+            closeQuietly(ps);
+            closeQuietly(c);
+        }
+    }
+
+    // Used to avoid repetitive code below.
+    private void fillWithPeerResults(ResultSet results,
+            Map<Integer, ArrayList<String>> map) throws SQLException {
+        Integer userId;
+        String address;
+        ArrayList<String> addTo;
+
+        while (results.next()) {
+            userId = results.getInt(1);
+            address = results.getString(2);
+
+            addTo = map.get(userId);
+            if (addTo == null) {
+                addTo = new ArrayList<String>();
+                map.put(userId, addTo);
+            }
+            addTo.add(address);
+        }
+
+        results.close();
+    }
+
+    /**
      * Returns a list of peers of each of the given blocks.
-     * @param blocks        List of block IDs for which to return peers.
+     * @param blockIds        List of block IDs for which to return peers.
      * @return              A map of the block IDs to the list of peer addresses
      *                      represented as strings.
      * @throws SQLException
      */
-    public Map<Integer, ArrayList<String>>
-            getPeersForBlocks(List<Integer> blocks) throws SQLException {
+    public Map<Integer, ArrayList<String>> getPeersForBlocks(
+            Collection<Integer> blockIds) throws SQLException {
         Map<Integer, ArrayList<String>> ret =
                 new HashMap<Integer, ArrayList<String>>();
         Connection c = null;
@@ -476,29 +549,27 @@ public class DataManager {
         try {
             c = connectionPool.getConnection();
             s = c.createStatement();
+            String blockIdsList = sqlList(blockIds);
             ResultSet results = s.executeQuery(
                 "SELECT c.bid, u.ip || ':' || u.port " +
                 "FROM completed c, users u " +
-                "WHERE c.uid = u.uid AND c.bid IN " + sqlList(blocks)
+                "WHERE c.uid = u.uid AND c.bid IN " + blockIdsList
             );
 
-            Integer userId;
-            String address;
-            ArrayList<String> addTo;
+            fillWithPeerResults(results, ret);
 
-            while (results.next()) {
-                userId = results.getInt(1);
-                address = results.getString(2);
+            // Getting the temp blocks peers.
+            results = s.executeQuery(
+                "SELECT t.bid, u.ip || ':' || u.port " +
+                "FROM tempblocks t, users u " +
+                "WHERE t.uid = u.uid AND t.bid IN " + blockIdsList
+            );
 
-                addTo = ret.get(userId);
-                if (addTo == null) {
-                    addTo = new ArrayList<String>();
-                    ret.put(userId, addTo);
-                }
-                addTo.add(address);
+            fillWithPeerResults(results, ret);
+
+            if (ret.isEmpty()) {
+                throw new NeguraError("No peers.");
             }
-
-            results.close();
 
             return ret;
         } finally {
@@ -524,7 +595,7 @@ public class DataManager {
             ResultSet results = s.executeQuery(
                 "SELECT ip || ':' || port " +
                 "FROM users " +
-                "WHERE id IN " + sqlList(userIds)
+                "WHERE uid IN " + sqlList(userIds)
             );
 
             List<String> addresses = new ArrayList<String>();
@@ -579,37 +650,6 @@ public class DataManager {
     }
 
     /**
-     * Sets the block specified as completed for the user.
-     * @param userId        The user which has completed the blocks.
-     * @param blockIds      The list of block IDs.
-     * @throws SQLException
-     */
-    public void insertCompleted(int userId, Collection<Integer> blockIds)
-            throws SQLException {
-        Connection c = null;
-        PreparedStatement ps = null;
-
-        try {
-            c = connectionPool.getConnection();
-            ps = c.prepareStatement(
-                "INSERT INTO completed " +
-                "VALUES (?, ?)"
-            );
-
-            for (Integer blockId : blockIds) {
-                ps.setInt(1, userId);
-                ps.setInt(2, blockId);
-                ps.addBatch();
-            }
-
-            ps.executeBatch();
-        } finally {
-            closeQuietly(ps);
-            closeQuietly(c);
-        }
-    }
-
-    /**
      * Returns the modification to the block list for a specified user after the
      * given order ID which is not included..
      * @param userId        The owner of the list.
@@ -628,7 +668,8 @@ public class DataManager {
             ResultSet results = s.executeQuery(
                 "SELECT bid " +
                 "FROM alist " +
-                "WHERE uid = " + userId + " AND orderb > " + after
+                "WHERE uid = " + userId + " AND orderb > " + after + " " +
+                "ORDER BY orderb"
             );
 
             List<Integer> ret = new ArrayList<Integer>();
@@ -842,16 +883,23 @@ public class DataManager {
      * Transforms a list into the format which is needed by the IN operator in
      * SQL. For example for a list containing 1, 2, 3 the returned string will
      * be <code>"(1, 2, 3)"<code>.
-     * @param <E>       The type of the element.
-     * @param list      The list of elements
-     * @return          A string containing the elements.
+     * @param <E>           The type of the element.
+     * @param collection    The list of elements
+     * @return              A string containing the elements.
      */
-    private <E> String sqlList(Collection<E> list) {
-        StringBuilder builder = new StringBuilder(list.size() * 4); // Suppose.
+    private <E> String sqlList(Collection<E> collection) {
+        if (collection.isEmpty())
+            return "()";
+
+        int estimateSize = collection.size() * 4;
+        StringBuilder builder = new StringBuilder(estimateSize);
+
         builder.append('(');
-        for (E e : list)
+        for (E e : collection) {
             builder.append(e.toString()).append(',');
+        }
         builder.deleteCharAt(builder.length() - 1).append(')');
+
         return builder.toString();
     }
 
@@ -893,11 +941,18 @@ public class DataManager {
         Statement s = null;
         try {
             s = c.createStatement();
-            ResultSet results = s.executeQuery("SELECT value FROM settings"
-                    + "WHERE key = '" + key + "'");
-            results.next();
+            ResultSet results = s.executeQuery(
+                "SELECT value " +
+                "FROM settings " +
+                "WHERE key = '" + key + "'"
+            );
+
+            if (!results.next())
+                throw new NeguraError("Key '%s' doesn't exist.", key);
+
             String ret = results.getString(1);
             results.close();
+
             return ret;
         } finally {
             closeQuietly(s);

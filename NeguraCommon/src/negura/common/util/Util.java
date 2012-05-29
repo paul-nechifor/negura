@@ -8,11 +8,13 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.net.InetSocketAddress;
+import java.util.ArrayList;
 import java.util.Collection;
 
 /**
@@ -146,7 +148,7 @@ public class Util {
         return new InetSocketAddress(split[0], port);
     }
 
-    public static final int[] toArray(Collection<Integer> collection) {
+    public static int[] toArray(Collection<Integer> collection) {
         int[] ret = new int[collection.size()];
         int k = 0;
 
@@ -156,5 +158,26 @@ public class Util {
         }
         
         return ret;
+    }
+
+    public static ArrayList<Integer> toArrayList(int[] array) {
+        ArrayList<Integer> ret = new ArrayList<Integer>();
+
+        for (int item : array) {
+            ret.add(item);
+        }
+        
+        return ret;
+    }
+
+    public static void copyStream(InputStream in, OutputStream out,
+            byte[] buffer) throws IOException {
+        int read;
+
+        while ((read = in.read(buffer)) >= 0)
+            out.write(buffer, 0, read);
+
+        in.close();
+        out.close();
     }
 }

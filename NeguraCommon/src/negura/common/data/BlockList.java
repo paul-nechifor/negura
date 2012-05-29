@@ -12,10 +12,10 @@ import com.google.gson.JsonSerializer;
 import java.io.File;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
-import negura.common.util.Util;
+import java.util.Set;
+import negura.common.util.NeguraLog;
 
 /**
  * A data type to manage the allocated block list.
@@ -96,6 +96,14 @@ public class BlockList {
     public synchronized void setDataDir(File dataDir) {
         downloadedBlockDir = new File(dataDir, "blocks");
         tempBlockDir = new File(dataDir, "temp_blocks");
+
+        if (!downloadedBlockDir.exists() && !downloadedBlockDir.mkdirs()) {
+            NeguraLog.severe("Failed to create '%d'.", downloadedBlockDir);
+        }
+
+        if (!tempBlockDir.exists() && !tempBlockDir.mkdirs()) {
+            NeguraLog.severe("Failed to create '%d'.", tempBlockDir);
+        }
     }
 
     public synchronized int getLastOrderId() {
@@ -120,6 +128,10 @@ public class BlockList {
         return new File(tempBlockDir, Integer.toString(blockId));
     }
 
+    public synchronized boolean isDownloadQueueEmpty() {
+        return downloadQueue.isEmpty();
+    }
+
     /**
      * The idea is that you get the state of the download queue as a whole and
      * try to download them; you might not be able to get them all and then you
@@ -127,12 +139,18 @@ public class BlockList {
      * the mean time.
      * @return
      */
-    public synchronized int[] getDownloadQueue() {
-        return Util.toArray(downloadQueue);
+    @SuppressWarnings("unchecked")
+    public synchronized List<Integer> getDownloadQueue() {
+        return (ArrayList<Integer>) downloadQueue.clone();
     }
 
-    public synchronized boolean isDownloadQueueEmpty() {
-        return downloadQueue.isEmpty();
+    public synchronized boolean isTempBlocksEmpty() {
+        return tempBlocks.isEmpty();
+    }
+
+    @SuppressWarnings("unchecked")
+    public synchronized Set<Integer> getTempBlocks() {
+        return (HashSet<Integer>) tempBlocks.clone();
     }
 
     public synchronized void addModifications(List<Integer> modifications) {
@@ -149,7 +167,7 @@ public class BlockList {
     }
 
     public synchronized void haveDownloadedBlock(int blockId) {
-        downloadQueue.remove(blockId);
+        downloadQueue.remove(new Integer(blockId)); // Damn boxing.
         downloadedBlocks.add(blockId);
     }
 

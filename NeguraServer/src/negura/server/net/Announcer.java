@@ -8,7 +8,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import negura.common.Service2;
 import negura.common.util.Comm;
@@ -34,10 +33,10 @@ public class Announcer extends Service2 {
     };
 
     private final DataManager dataManager;
-    private final HashSet<Integer> allocatedUsers = new HashSet<Integer>();
+    private final Object allocatedUsersLock = new Object();
+    private HashSet<Integer> allocatedUsers = new HashSet<Integer>();
     private final ScheduledExecutorService scheduler
             = Executors.newScheduledThreadPool(1);
-    private ScheduledFuture<?> blocksTask;
 
     public Announcer(DataManager dataManager) {
         this.dataManager = dataManager;
@@ -46,14 +45,14 @@ public class Announcer extends Service2 {
     @Override
     public void start() {
         super.start();
-        blocksTask = scheduler.scheduleAtFixedRate(callAnnounceNewBlocks,
-                200, 200, TimeUnit.MILLISECONDS);
+        scheduler.scheduleAtFixedRate(callAnnounceNewBlocks,
+                5, 5, TimeUnit.MINUTES);
     }
 
     @Override
     public void stop() {
         super.stop();
-        blocksTask.cancel(false);
+        scheduler.shutdown();
     }
 
     /**
@@ -62,7 +61,7 @@ public class Announcer extends Service2 {
      * @param userIds       The list of user ids.
      */
     public void addNewAllocatedUsers(List<Integer> userIds) {
-        synchronized (allocatedUsers) {
+        synchronized (allocatedUsersLock) {
             allocatedUsers.addAll(userIds);
         }
     }
@@ -75,14 +74,14 @@ public class Announcer extends Service2 {
         scheduler.schedule(callAnnounceNewOperations, 0, TimeUnit.SECONDS);
     }
 
-    @SuppressWarnings("unchecked")
     private void announceNewBlocks() {
         // Cloning it so I can process it without hogging the lock.
         HashSet<Integer> userIds;
-        synchronized (allocatedUsers) {
+        synchronized (allocatedUsersLock) {
             if (allocatedUsers.isEmpty())
                 return;
-            userIds = (HashSet<Integer>) allocatedUsers.clone();
+            userIds = allocatedUsers;
+            allocatedUsers = new HashSet<Integer>();
         }
 
         List<String> addresses = null;
@@ -126,5 +125,7 @@ public class Announcer extends Service2 {
                 NeguraLog.warning(ex);
             }
         }
+
+        announceNewBlocks();
     }
 }

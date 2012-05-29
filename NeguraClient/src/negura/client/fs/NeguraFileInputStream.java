@@ -45,7 +45,7 @@ public class NeguraFileInputStream extends InputStream {
             blockIds[i] = o.firstbid + i;
 
         // Tell the peer cache to ready the peer lists for the blocks.
-        cm.getPeerCache().preemptivelyCache(blockIds);
+        cm.getPeerCache().preemptivelyCache(Util.toArrayList(blockIds));
 
         // Load the first block.
         makeBlockAvailable(blockIds[blockIndex], (int)position % blockSize);

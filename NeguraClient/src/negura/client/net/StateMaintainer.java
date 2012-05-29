@@ -5,19 +5,25 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import negura.client.ClientConfigManager;
 import negura.common.util.Comm;
 import negura.common.Service;
+import negura.common.data.BlockList;
 import negura.common.data.Operation;
 import negura.common.json.Json;
 import negura.common.util.NeguraLog;
+import negura.common.util.Util;
 
 /**
  * Manages the download of the blocks which have been allocated to this user by
@@ -29,7 +35,7 @@ public class StateMaintainer extends Service {
     private final ClientConfigManager cm;
     private final byte[] buffer;
 
-    private ArrayList<Integer> completed = new ArrayList<Integer>();
+    private final HashSet<Integer> completed = new HashSet<Integer>();
 
     private long lastSent = System.currentTimeMillis();
     private int sendAt = 60 * 1000;
@@ -46,7 +52,8 @@ public class StateMaintainer extends Service {
     }
 
     public void run() {
-        int[] downloadQueue;
+        List<Integer> downloadQueue;
+        BlockList blockList = cm.getBlockList();
         Map<Integer, ArrayList<String>> peers;
         long now;
 
@@ -83,10 +90,16 @@ public class StateMaintainer extends Service {
                 lastSent = System.currentTimeMillis();
             }
 
-            if (cm.getBlockList().isDownloadQueueEmpty())
+            if (blockList.isDownloadQueueEmpty())
                 continue;
 
-            downloadQueue = cm.getBlockList().getDownloadQueue();
+            downloadQueue = blockList.getDownloadQueue();
+
+            // If the blocks are in my temp blocks, extract those that are.
+            if (!blockList.isTempBlocksEmpty()) {
+                copyTempBlocks(downloadQueue, blockList.getTempBlocks());
+            }
+
             cm.getPeerCache().preemptivelyCache(downloadQueue);
 
             for (int id : downloadQueue)
@@ -151,6 +164,7 @@ public class StateMaintainer extends Service {
             if (!saveBlock(bid, buffer, read))
                 continue;
 
+            assert !completed.contains(bid);
             completed.add(bid);
             cm.getBlockList().haveDownloadedBlock(bid);
 
@@ -170,11 +184,50 @@ public class StateMaintainer extends Service {
             out.close();
             return true;
         } catch (IOException ex) {
-            NeguraLog.warning(ex, "Couldn't write block.");
+            NeguraLog.warning(ex, "Couldn't write block %d.", bid);
             return false;
         }
     }
 
+    /**
+     * Copies the temporary blocks as if they were downloaded.
+     * @param downloadQueue     The blocks which I might have on the system.
+     * @param tempBlocks        The blocks which I have on the system.
+     */
+    private void copyTempBlocks(List<Integer> downloadQueue,
+            Set<Integer> tempBlocks) {
+        BlockList blockList = cm.getBlockList();
+        File fin, fout;
+        FileInputStream fis;
+        FileOutputStream fos;
+        byte[] copyBuffer = new byte[8 * 1024];
+
+        ArrayList<Integer> toBeDownloaded = new ArrayList<Integer>();
+        for (Integer blockId : downloadQueue) {
+            if (tempBlocks.contains(blockId))
+                toBeDownloaded.add(blockId);
+        }
+
+        for (int blockId : toBeDownloaded) {
+            
+            try {
+                fin = blockList.getFileToSaveTempBlockTo(blockId);
+                fout = blockList.getFileToSaveBlockTo(blockId);
+                fis = new FileInputStream(fin);
+                fos = new FileOutputStream(fout);
+                Util.copyStream(fis, fos, copyBuffer);
+
+                assert !completed.contains(blockId);
+                completed.add(blockId);
+                cm.getBlockList().haveDownloadedBlock(blockId);
+            } catch (IOException ex) {
+                NeguraLog.warning(ex, "Error copying block.");
+            }
+        }
+
+        // Removing the completed ones.
+        downloadQueue.removeAll(completed);
+    }
     private void sendCompletedBlocks() {
         if (completed.isEmpty())
             return;
@@ -194,4 +247,6 @@ public class StateMaintainer extends Service {
             NeguraLog.warning(ex, "Couldn't communicate with the server.");
         }
     }
+
+
 }

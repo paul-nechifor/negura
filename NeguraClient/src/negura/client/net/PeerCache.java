@@ -6,10 +6,13 @@ import com.google.gson.JsonObject;
 import com.google.gson.JsonPrimitive;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import negura.client.ClientConfigManager;
 import negura.common.util.Comm;
 import negura.common.util.NeguraLog;
@@ -22,8 +25,13 @@ import negura.common.util.Util;
 public class PeerCache {
     private final ClientConfigManager cm;
     private final InetSocketAddress myPeerAddress;
-    private final HashMap<Integer, PeerList> blocks
-            = new HashMap<Integer, PeerList>();
+    private final HashMap<Integer, PeerSet> blocks
+            = new HashMap<Integer, PeerSet>();
+
+    private static class PeerSet {
+        HashSet<InetSocketAddress> set = new HashSet<InetSocketAddress>();
+        long lastUpdate;
+    }
 
     public PeerCache(ClientConfigManager cm) {
         this.cm = cm;
@@ -31,7 +39,10 @@ public class PeerCache {
                 cm.getServicePort());
     }
 
-    public synchronized void preemptivelyCache(int[] blockIds) {
+    public synchronized void preemptivelyCache(Collection<Integer> blockIds) {
+        if (blockIds.isEmpty())
+            return;
+
         JsonObject mesg = Comm.newMessage("peers-for-blocks");
         JsonArray list = new JsonArray();
         for (int i : blockIds)
@@ -46,51 +57,53 @@ public class PeerCache {
             return;
         }
 
-        JsonObject o;
-        PeerList peerList;
-        int block;
+        Integer blockId;
+        PeerSet peerSet;
         InetSocketAddress address;
 
-        for (JsonElement e : resp.getAsJsonArray("blocks")) {
-            o = e.getAsJsonObject();
-            block = o.get("id").getAsInt();
+        for (Entry<String, JsonElement> pair
+                : resp.getAsJsonObject("blocks").entrySet()) {
+            blockId = Integer.parseInt(pair.getKey());
 
-            if (blocks.containsKey(block)) {
-                peerList = blocks.get(block);
-            } else {
-                peerList = new PeerList();
-                blocks.put(block, peerList);
+            peerSet = blocks.get(blockId);
+
+            if (peerSet == null) {
+                peerSet = new PeerSet();
+                blocks.put(blockId, peerSet);
             }
-            // Update the time.
-            peerList.lastUpdate = System.currentTimeMillis();
 
-            for (JsonElement f : o.getAsJsonArray("peers")) {
+            // Update the time.
+            peerSet.lastUpdate = System.nanoTime();
+
+            for (JsonElement f : pair.getValue().getAsJsonArray()) {
                 address = Util.stringToSocketAddress(f.getAsString());
+
                 // Don't add myself.
-                if (!address.equals(myPeerAddress))
-                    peerList.list.add(address);
+                if (!address.equals(myPeerAddress)) {
+                    peerSet.set.add(address);
+                }
             }
         }
     }
 
     /**
      * Get the peer addresses in a random order for a given block.
-     * @param id
+     * @param blockId
      * @return
      */
-    public synchronized List<InetSocketAddress> getPeersForBlock(int id) {
+    public synchronized List<InetSocketAddress> getPeersForBlock(int blockId) {
         // If the block isn't in the list, try to get it.
-        if (!blocks.containsKey(id)) {
-            preemptivelyCache(new int[]{id});
+        if (!blocks.containsKey(blockId)) {
+            preemptivelyCache(Arrays.asList(blockId));
         }
 
-        if (!blocks.containsKey(id)) {
-            NeguraLog.warning("Couldn't get peers for block %d.", id);
+        if (!blocks.containsKey(blockId)) {
+            NeguraLog.warning("Couldn't get peers for block %d.", blockId);
             return null;
         }
 
         List<InetSocketAddress> peers = new ArrayList<InetSocketAddress>(
-                blocks.get(id).list);
+                blocks.get(blockId).set);
         Collections.shuffle(peers);
 
         // TODO: if the entry is too old, update the list for the block along
@@ -102,9 +115,4 @@ public class PeerCache {
         // TODO: Maybe. If the cache is too small, add random blocks. I might
         // need them in the future, or my peers might need them.
     }
-}
-
-class PeerList {
-    HashSet<InetSocketAddress> list = new HashSet<InetSocketAddress>();
-    long lastUpdate;
 }

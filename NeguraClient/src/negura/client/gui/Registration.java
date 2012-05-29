@@ -6,8 +6,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.KeyPair;
 import java.security.interfaces.RSAPublicKey;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import negura.client.ClientConfigManager;
 import negura.client.ClientConfigManager.Builder;
 import negura.client.I18n;
@@ -356,8 +354,6 @@ public class Registration {
         rsaKeyPair.encryptedPrivateKey = "To encrypt later.";
 
         int storedBlocks = serverInfo.minimumBlocks;
-        if (code == 0)
-            storedBlocks = 700;
 
         Builder builder = new Builder(configFile).serverAddress(serverAddress)
                 .serverInfo(serverInfo).dataDir(dir).servicePort(port)

@@ -107,13 +107,6 @@ public class ClientConfigManager {
         }
     }
 
-    // Final objects.
-    private final Builder builder;
-    private final PeerCache peerCache;
-    private final BlockCache blockCache;
-    private final BlockList blockList;
-    private final NeguraFsView fsView;
-
     // Immutable fields.
     private final InetSocketAddress serverAddress;
     private final int storedBlocks;
@@ -125,19 +118,19 @@ public class ClientConfigManager {
     private final int blockSize;
     private final File logFile;
 
+    // Final objects.
+    private final Builder builder;
+    private final PeerCache peerCache;
+    private final BlockCache blockCache;
+    private final BlockList blockList;
+    private final NeguraFsView fsView;
+
     public ClientConfigManager(Builder builder) throws IOException {
         // Loading the file log handler as early as possible to log errors.
         FileHandler handler = new FileHandler(
                 builder.logFile.getAbsolutePath(), true);
         handler.setFormatter(NeguraLog.FORMATTER);
         NeguraLog.addHandler(handler);
-
-        // Initializing final objects.
-        this.builder = builder;
-        this.peerCache = new PeerCache(this);
-        this.blockCache = new BlockCache(this);
-        this.blockList = builder.blockList;
-        this.fsView = new NeguraFsView(this, builder.operations);
 
         // Initializing immutable fields.
         this.serverAddress = builder.serverAddress;
@@ -149,6 +142,13 @@ public class ClientConfigManager {
         this.userId = builder.userId;
         this.blockSize = builder.serverInfo.blockSize;
         this.logFile = builder.logFile;
+
+        // Initializing final objects.
+        this.builder = builder;
+        this.peerCache = new PeerCache(this);
+        this.blockCache = new BlockCache(this);
+        this.blockList = builder.blockList;
+        this.fsView = new NeguraFsView(this, builder.operations);
 
         // Special initialization operations.
         this.blockCache.load();

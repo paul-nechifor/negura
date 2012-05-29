@@ -83,5 +83,3 @@ CREATE TABLE tempblocks (
     bid INTEGER REFERENCES blocks(bid) ON DELETE CASCADE,
     remove INTEGER              -- Date in UNIX timestamp when to remove this.
 );
-
-COMMIT;
