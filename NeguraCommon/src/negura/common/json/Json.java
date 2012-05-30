@@ -91,4 +91,14 @@ public class Json {
             toBeExtended.add(e.getKey(), e.getValue());
         }
     }
+
+    public static int getDefault(JsonObject o, String field, int defValue) {
+        JsonElement e = o.get(field);
+
+        if (e == null) {
+            return defValue;
+        }
+
+        return e.getAsInt();
+    }
 }

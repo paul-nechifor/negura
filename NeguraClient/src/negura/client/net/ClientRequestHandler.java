@@ -12,6 +12,7 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import negura.client.ClientConfigManager;
 import negura.client.Negura;
+import negura.common.json.Json;
 import negura.common.util.Comm;
 import negura.common.net.RequestHandler;
 import negura.common.util.NeguraLog;
@@ -23,21 +24,19 @@ import negura.common.util.Util;
  */
 public class ClientRequestHandler implements RequestHandler {
     private final ClientConfigManager cm;
-    private final byte[] buffer;
     private final Negura negura;
 
     public ClientRequestHandler(Negura negura, ClientConfigManager cm) {
         this.negura = negura;
         this.cm = cm;
-        this.buffer = new byte[cm.getBlockSize()];
     }
 
     public void handle(Socket socket) {
         JsonObject message = Comm.readMessage(socket);
 
+        long start = System.nanoTime();
         String request = message.get("request").getAsString();
-        NeguraLog.info("Request '%s' from %s:%d.", request,
-                socket.getInetAddress().getHostAddress(), socket.getPort());
+        
 
         // The handle_* functions needn't close the socket as it is
         // automatically closed after the function call.
@@ -64,6 +63,12 @@ public class ClientRequestHandler implements RequestHandler {
                 NeguraLog.warning(ex);
             }
         }
+
+        if (!request.equals("up-block")) {
+            NeguraLog.info("Request '%s' from %s:%d. %d", request,
+                    socket.getInetAddress().getHostAddress(), socket.getPort(),
+                    System.nanoTime() - start);
+        }
     }
 
     private void handle_block_announce(Socket socket, JsonObject message)
@@ -82,15 +87,8 @@ public class ClientRequestHandler implements RequestHandler {
         BufferedOutputStream bos = new BufferedOutputStream(os);
         DataOutputStream dos = new DataOutputStream(bos);
 
-        int offset = 0;
-        int length = -1;
-
-        if (message.get("offset") != null) {
-            offset = message.get("offset").getAsInt();
-        }
-        if (message.get("length") != null) {
-            length = message.get("length").getAsInt();
-        }
+        int offset = Json.getDefault(message, "offset", 0);
+        int length = Json.getDefault(message, "length", -1);
 
         if (blockLocation == null) {
             dos.writeInt(Comm.BLOCK_NOT_FOUND);
@@ -117,6 +115,8 @@ public class ClientRequestHandler implements RequestHandler {
             in.skip(offset);
         }
 
+        // TODO: Reuse the buffer.
+        byte[] buffer = new byte[cm.getBlockSize()];
         int read = Util.readBytes(buffer, 0, length, in);
 
         try {

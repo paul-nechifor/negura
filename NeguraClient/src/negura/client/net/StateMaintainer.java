@@ -11,7 +11,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -26,9 +25,6 @@ import negura.common.util.NeguraLog;
 import negura.common.util.Util;
 
 /**
- * Manages the download of the blocks which have been allocated to this user by
- * the server. All the methods are private and are running within a single
- * thread so no synchronization is needed.
  * @author Paul Nechifor
  */
 public class StateMaintainer extends Service {

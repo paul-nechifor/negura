@@ -10,8 +10,9 @@ def register(n):
     for i in xrange(n):
         print "Starting", i
         out = open("out.sh", "w")
+#java -Xms4M -Xmx20M -cp ../NeguraClient/dist/Negura-*Linux64.jar negura.client.Main autoreg %d 127.0.0.1 5000
         out.write("""#!/bin/bash
-java -Xms4M -Xmx20M -cp ../NeguraClient/dist/Negura-*Linux64.jar negura.client.Main autoreg %d 127.0.0.1 5000
+java -cp ../NeguraClient/dist/Negura-*Linux64.jar negura.client.Main autoreg %d 127.0.0.1 5000
 sleep 9h
 """ % i)
         out.close()

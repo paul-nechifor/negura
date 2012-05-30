@@ -26,9 +26,6 @@
  *
  * TODO: User joins in DataManager.
  *
- * TODO: wrap everything in try-catch in NeguraFileInputStream to catch that
- * ugly bug.
- *
  * TODO: Enable assertions.
  *
  * TODO: Learn about NIO and use it.
@@ -104,25 +101,15 @@ public class Negura {
         requestServer.startInNewThread();
         stateMaintainer.startInNewThread();
 
-        try {
-            Thread.sleep(9999);
-        } catch (InterruptedException ex) { }
+
 
         if (cm.getServicePort() == 20000) {
             try {
+                Thread.sleep(30000);
                 addDir(new File("/home/p/tmp/negura"), "");
-            } catch (Exception ex) {
-                NeguraLog.severe(ex);
-            }
-
-            try {
-                Thread.sleep(6000);
-            } catch (InterruptedException ex) { }
-
-            try {
                 JsonObject mesg = Comm.newMessage("trigger-fs-update");
                 Comm.readMessage(cm.getServerAddress(), mesg);
-            } catch (IOException ex) {
+            } catch (Exception ex) {
                 NeguraLog.severe(ex);
             }
         }

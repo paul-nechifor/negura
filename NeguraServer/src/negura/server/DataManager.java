@@ -2,7 +2,6 @@ package negura.server;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
-import java.sql.BatchUpdateException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -15,8 +14,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import negura.common.ex.NeguraEx;
 import negura.common.util.Util;
 import negura.common.data.Block;
