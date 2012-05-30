@@ -20,6 +20,7 @@ import negura.common.util.Comm;
 import negura.common.Service;
 import negura.common.data.BlockList;
 import negura.common.data.Operation;
+import negura.common.ex.NeguraError;
 import negura.common.json.Json;
 import negura.common.util.NeguraLog;
 import negura.common.util.Util;
@@ -160,7 +161,10 @@ public class StateMaintainer extends Service {
             if (!saveBlock(bid, buffer, read))
                 continue;
 
-            assert !completed.contains(bid);
+            if (completed.contains(bid)) {
+                throw new NeguraError("Already have.");
+            }
+
             completed.add(bid);
             cm.getBlockList().haveDownloadedBlock(bid);
 
@@ -213,7 +217,10 @@ public class StateMaintainer extends Service {
                 fos = new FileOutputStream(fout);
                 Util.copyStream(fis, fos, copyBuffer);
 
-                assert !completed.contains(blockId);
+                if (completed.contains(blockId)) {
+                    throw new NeguraError("Already have.");
+                }
+
                 completed.add(blockId);
                 cm.getBlockList().haveDownloadedBlock(blockId);
             } catch (IOException ex) {

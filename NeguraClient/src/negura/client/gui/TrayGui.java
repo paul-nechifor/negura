@@ -1,8 +1,6 @@
 package negura.client.gui;
 
 import java.io.File;
-import java.util.HashMap;
-import java.util.Map;
 import negura.client.ClientConfigManager;
 import negura.client.I18n;
 import negura.client.Negura;
@@ -25,32 +23,24 @@ import org.eclipse.swt.widgets.TrayItem;
  * @author Paul Nechifor
  */
 public class TrayGui extends Service {
-    private static final String[] IMAGES = new String[] {
-        "trayicon", "/res/icons/application_24.png",
-        "exit", "/res/icons/exit_16.png"
-    };
-
-    private final Shell mainShell;
     private final Display display;
-    private final Map<String, Image> icons = new HashMap<String, Image>();
-    private final TrayItem trayItem;
+    private final Shell mainShell;
     private final Negura negura;
     private final ClientConfigManager cm;
+    private final TrayItem trayItem;
+    private final CommonResources resources;
 
     private LogWindow logWindow = null;
+    private Statistics statistics = null;
 
     public TrayGui(Negura negura, ClientConfigManager cm) {
         this.negura = negura;
         this.cm = cm;
-        display = new Display();
-        mainShell = new Shell(display);
-        trayItem = new TrayItem(display.getSystemTray(), SWT.NONE);
+        this.display = new Display();
+        this.resources = new CommonResources(display);
+        this.mainShell = new Shell(display);
+        this.trayItem = new TrayItem(display.getSystemTray(), SWT.NONE);
 
-        Class<?> c = getClass();
-        for (int i = 0; i < IMAGES.length; i += 2) {
-            Image img = new Image(display, c.getResourceAsStream(IMAGES[i+1]));
-            icons.put(IMAGES[i], img);
-        }
         load();
     }
 
@@ -68,8 +58,8 @@ public class TrayGui extends Service {
     }
 
     private void load() {
-        mainShell.setImage(icons.get("trayicon"));
-        trayItem.setImage(icons.get("trayicon"));
+        mainShell.setImage(resources.getImage("tray"));
+        trayItem.setImage(resources.getImage("tray"));
         trayItem.setToolTipText(I18n.format("servingOn", cm.getServicePort()));
 
         final Menu menu = new Menu(mainShell, SWT.POP_UP);
@@ -77,12 +67,13 @@ public class TrayGui extends Service {
         startFtpMi.setText(I18n.get("startFtp"));
         MenuItem refreshMi = n(menu, SWT.PUSH, I18n.get("refreshFileSystem"));
         MenuItem viewLogMi = n(menu, SWT.PUSH, I18n.get("openLog"));
+        MenuItem statisticsMi = n(menu, SWT.PUSH, "Statistics");
         n(menu, SWT.SEPARATOR, null);
         MenuItem exitMi = n(menu, SWT.PUSH, I18n.get("exit"),
-                icons.get("exit"));
+                resources.getImage("exit"));
         n(menu, SWT.SEPARATOR, null);
         MenuItem selfDestructMi = n(menu, SWT.PUSH, I18n.get("selfDestruct"),
-                icons.get("exit"));
+                resources.getImage("exit"));
         
         menu.setDefaultItem(startFtpMi);
 
@@ -115,6 +106,11 @@ public class TrayGui extends Service {
                 openLogWindow();
             }
         });
+        statisticsMi.addListener(SWT.Selection, new Listener() {
+            public void handleEvent(Event event) {
+                openStatisticsWindow();
+            }
+        });
         exitMi.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
                 negura.shutdown(true);
@@ -131,11 +127,20 @@ public class TrayGui extends Service {
         });
     }
 
-    private void openLogWindow() {
-        if (logWindow == null || logWindow.isClosed())
-            logWindow = new LogWindow(display, cm);
-        else
+    private synchronized void openLogWindow() {
+        if (logWindow == null || logWindow.isDisposed()) {
+            logWindow = new LogWindow(display, resources, cm);
+        } else {
             logWindow.forceActive();
+        }
+    }
+
+    private synchronized void openStatisticsWindow() {
+        if (statistics == null || statistics.isDisposed()) {
+            statistics = new Statistics(display, resources);
+        } else {
+            statistics.forceActive();
+        }
     }
 
     private void tip(String text, String message) {
@@ -157,8 +162,7 @@ public class TrayGui extends Service {
             }
         }
 
-        for (Image image : icons.values())
-            image.dispose();
+        resources.dispose();
         mainShell.dispose();
         display.dispose();
     }

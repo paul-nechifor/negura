@@ -8,25 +8,23 @@ import java.util.logging.LogRecord;
 import negura.client.ClientConfigManager;
 import negura.client.I18n;
 import negura.common.gui.Swt;
+import negura.common.gui.Window;
 import negura.common.util.NeguraLog;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.StyledText;
 import org.eclipse.swt.events.ShellEvent;
 import org.eclipse.swt.events.ShellListener;
 import org.eclipse.swt.graphics.Font;
-import org.eclipse.swt.graphics.Image;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 
 /**
- *
  * @author Paul Nechifor
  */
-public class LogWindow {
-    private Shell shell;
-    private ClientConfigManager cm; // Shut up Netbeans. It is actually used.
-    private WindowLogHandler windowLogHandler;
+public class LogWindow extends Window {
+    private final ClientConfigManager cm; // Shut up NetBeans. It is used.
+    private final WindowLogHandler windowLogHandler;
     private final Font smallFont;
 
     private static class WindowLogHandler extends Handler {
@@ -54,17 +52,15 @@ public class LogWindow {
         public void close() throws SecurityException { }
     }
 
-    public LogWindow(Display display, ClientConfigManager cm) {
+    public LogWindow(Display display, CommonResources resources,
+            ClientConfigManager cm) {
+        super(new Shell(display));
         this.cm = cm;
 
-        shell = new Shell(display);
         shell.setText(I18n.get("log"));
         shell.setSize(455, 368);
         shell.setLayout(new FillLayout());
-        Image icon = new Image(display, getClass().getResourceAsStream(
-                "/res/icons/application_32.png"));
-        Swt.connectDisposal(shell, icon);
-        shell.setImage(icon);
+        shell.setImage(resources.getImage("application"));
         smallFont = Swt.getMonospacedFont(display, 8);
         Swt.connectDisposal(shell, smallFont);
 
@@ -78,9 +74,7 @@ public class LogWindow {
                 // It might not have been added yet.
                 if (windowLogHandler != null)
                     NeguraLog.removeHandler(windowLogHandler);
-                shell.dispose();
-                // Setting to null for isClosed() method.
-                shell = null;
+                dispose();
             }
 
             public void shellActivated(ShellEvent se) { }
@@ -106,13 +100,5 @@ public class LogWindow {
 
         windowLogHandler = new WindowLogHandler(styledText);
         NeguraLog.addHandler(windowLogHandler);
-    }
-
-    public void forceActive() {
-        shell.forceActive();
-    }
-
-    public boolean isClosed() {
-        return shell == null;
     }
 }

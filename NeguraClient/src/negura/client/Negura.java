@@ -25,10 +25,6 @@
  * TODO: Put a handler for the exceptions in different threads.
  *
  * TODO: User joins in DataManager.
- *
- * TODO: Enable assertions.
- *
- * TODO: Learn about NIO and use it.
  */
 
 package negura.client;

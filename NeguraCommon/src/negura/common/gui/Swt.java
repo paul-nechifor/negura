@@ -22,6 +22,7 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Event;
+import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
 import org.eclipse.swt.widgets.Shell;
@@ -173,6 +174,13 @@ public class Swt {
         ret.setMaximum(max);
         ret.setMinimum(min);
         ret.setIncrement(increment);
+        return ret;
+    }
+
+    public static Group newGroup(Composite c, String layout, String text) {
+        Group ret = n(Group.class, c, SWT.NONE, layout);
+        if (text != null)
+            ret.setText(text);
         return ret;
     }
 

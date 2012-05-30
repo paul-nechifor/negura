@@ -63,15 +63,14 @@ public class Registration {
 
     public Registration() {
         display = new Display();
+        CommonResources resources = new CommonResources(display);
         shell = new Shell(display);
         shell.setText(I18n.get("applicationName"));
         shell.setSize(550, 400);
         stackLayout = new StackLayout();
         shell.setLayout(stackLayout);
-        Image icon = new Image(display, getClass().getResourceAsStream(
-                "/res/icons/application_32.png"));
-        Swt.connectDisposal(shell, icon);
-        shell.setImage(icon);
+        shell.setImage(resources.getImage("application"));
+        Swt.connectDisposal(shell, resources);
 
         Swt.getMonospacedFont(display, 12);
 
