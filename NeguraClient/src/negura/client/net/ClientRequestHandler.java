@@ -12,6 +12,7 @@ import java.net.Socket;
 import java.net.UnknownHostException;
 import negura.client.ClientConfigManager;
 import negura.client.Negura;
+import negura.common.data.TrafficAggregator;
 import negura.common.json.Json;
 import negura.common.util.Comm;
 import negura.common.net.RequestHandler;
@@ -25,10 +26,12 @@ import negura.common.util.Util;
 public class ClientRequestHandler implements RequestHandler {
     private final ClientConfigManager cm;
     private final Negura negura;
+    private final TrafficAggregator trafficAggregator;
 
     public ClientRequestHandler(Negura negura, ClientConfigManager cm) {
         this.negura = negura;
         this.cm = cm;
+        this.trafficAggregator = cm.getTrafficAggregator();
     }
 
     public void handle(Socket socket) {
@@ -94,6 +97,7 @@ public class ClientRequestHandler implements RequestHandler {
             dos.writeInt(Comm.BLOCK_NOT_FOUND);
             NeguraLog.warning("Requested block %d not found.", blockId);
             dos.flush();
+            trafficAggregator.addSessionUp(4);
             return;
         }
 
@@ -102,6 +106,7 @@ public class ClientRequestHandler implements RequestHandler {
             dos.writeInt(Comm.BLOCK_INVALID_LENGTH);
             NeguraLog.warning("Invalid length %d > %d.", length, realLength);
             dos.flush();
+            trafficAggregator.addSessionUp(4);
             return;
         }
 
@@ -124,6 +129,7 @@ public class ClientRequestHandler implements RequestHandler {
             dos.writeInt(read);
             dos.flush();
             bos.write(buffer, 0, read);
+            trafficAggregator.addSessionUp(4 + 4 + read);
         } catch (IOException ex) {
             NeguraLog.warning(ex);
         }

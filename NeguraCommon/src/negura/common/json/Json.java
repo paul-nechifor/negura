@@ -17,6 +17,7 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.util.Map.Entry;
 import negura.common.data.BlockList;
+import negura.common.data.TrafficAggregator;
 
 /**
  *
@@ -37,6 +38,8 @@ public class Json {
                 new RSAPrivateKeyTypeConverter());
         builder.registerTypeAdapter(BlockList.class,
                 new BlockList.TypeConverter());
+        builder.registerTypeAdapter(TrafficAggregator.class,
+                new TrafficAggregator.TypeConverter());
         builder.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_DASHES);
         GSON = builder.create();
     }

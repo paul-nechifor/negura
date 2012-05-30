@@ -1,7 +1,5 @@
 package negura.client;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import negura.client.net.BlockCache;
 import negura.client.net.PeerCache;
 import negura.client.fs.NeguraFsView;
@@ -15,6 +13,7 @@ import negura.common.data.BlockList;
 import negura.common.data.Operation;
 import negura.common.data.RsaKeyPair;
 import negura.common.data.ServerInfo;
+import negura.common.data.TrafficAggregator;
 import negura.common.json.Json;
 import negura.common.util.NeguraLog;
 
@@ -23,8 +22,6 @@ import negura.common.util.NeguraLog;
  * For those that change, classes that need them should always use the accessors
  * to get the current values.
  * 
- * TODO: Use Reader-Writer locks and not synchronized methods.
- * TODO: User annotations for mutability.
  * @author Paul Nechifor
  */
 public class ClientConfigManager {
@@ -43,8 +40,10 @@ public class ClientConfigManager {
         private File logFile;
         
         // These cannot be initialized by the builder.
-        private BlockList blockList = new BlockList();
-        private List<Operation> operations = new ArrayList<Operation>();
+        private final BlockList blockList = new BlockList();
+        private final List<Operation> operations = new ArrayList<Operation>();
+        private final TrafficAggregator trafficAggregator
+                = new TrafficAggregator();
 
         public Builder(File configFile) {
             this.configFile = configFile;
@@ -103,7 +102,7 @@ public class ClientConfigManager {
         public ClientConfigManager build() throws IOException {
             if (logFile == null)
                 logFile = new File(configFile.getParent(), "log.txt");
-            return new ClientConfigManager(this);
+            return new ClientConfigManager(this, null);
         }
     }
 
@@ -124,8 +123,11 @@ public class ClientConfigManager {
     private final BlockCache blockCache;
     private final BlockList blockList;
     private final NeguraFsView fsView;
+    private final Negura negura;
+    private final TrafficAggregator trafficAggregator;
 
-    public ClientConfigManager(Builder builder) throws IOException {
+    public ClientConfigManager(Builder builder, Negura negura)
+            throws IOException {
         // Loading the file log handler as early as possible to log errors.
         FileHandler handler = new FileHandler(
                 builder.logFile.getAbsolutePath(), true);
@@ -149,14 +151,17 @@ public class ClientConfigManager {
         this.blockCache = new BlockCache(this);
         this.blockList = builder.blockList;
         this.fsView = new NeguraFsView(this, builder.operations);
+        this.negura = negura;
+        this.trafficAggregator = builder.trafficAggregator;
 
         // Special initialization operations.
         this.blockCache.load();
         this.builder.blockList.setDataDir(builder.dataDir);
     }
 
-    public ClientConfigManager(File configFile) throws IOException {
-        this(Json.fromFile(configFile, Builder.class));
+    public ClientConfigManager(File configFile, Negura negura)
+            throws IOException {
+        this(Json.fromFile(configFile, Builder.class), negura);
         this.builder.configFile = configFile;
     }
 
@@ -178,6 +183,14 @@ public class ClientConfigManager {
 
     public final NeguraFsView getFsView() {
         return fsView;
+    }
+
+    public final Negura getNegura() {
+        return negura;
+    }
+
+    public final TrafficAggregator getTrafficAggregator() {
+        return trafficAggregator;
     }
 
     public final InetSocketAddress getServerAddress() {

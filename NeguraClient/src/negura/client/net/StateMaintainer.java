@@ -20,6 +20,7 @@ import negura.common.util.Comm;
 import negura.common.Service;
 import negura.common.data.BlockList;
 import negura.common.data.Operation;
+import negura.common.data.TrafficAggregator;
 import negura.common.ex.NeguraError;
 import negura.common.json.Json;
 import negura.common.util.NeguraLog;
@@ -30,6 +31,7 @@ import negura.common.util.Util;
  */
 public class StateMaintainer extends Service {
     private final ClientConfigManager cm;
+    private final TrafficAggregator trafficAggregator;
     private final byte[] buffer;
 
     private final HashSet<Integer> completed = new HashSet<Integer>();
@@ -44,6 +46,7 @@ public class StateMaintainer extends Service {
 
     public StateMaintainer(ClientConfigManager cm) {
         this.cm = cm;
+        this.trafficAggregator = cm.getTrafficAggregator();
         this.buffer = new byte[cm.getBlockSize()];
         this.sendAt = 60 * 1000;
     }
@@ -157,6 +160,8 @@ public class StateMaintainer extends Service {
             int read = Comm.readBlock(buffer, 0, -1, bid, address);
             if (read <= 0) // Couldn't get block.
                 continue;
+
+            trafficAggregator.addSessionDown(read);
 
             if (!saveBlock(bid, buffer, read))
                 continue;

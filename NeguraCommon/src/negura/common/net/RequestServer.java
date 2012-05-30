@@ -34,6 +34,10 @@ public class RequestServer extends Service {
         }
     }
 
+    public int getThreadsActive() {
+        return exec.getActiveCount();
+    }
+
     /**
      * Returns a ThreadPoolExecutor from the options.
      * @param options

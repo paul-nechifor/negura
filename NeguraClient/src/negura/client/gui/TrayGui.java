@@ -137,7 +137,7 @@ public class TrayGui extends Service {
 
     private synchronized void openStatisticsWindow() {
         if (statistics == null || statistics.isDisposed()) {
-            statistics = new Statistics(display, resources);
+            statistics = new Statistics(display, resources, cm);
         } else {
             statistics.forceActive();
         }

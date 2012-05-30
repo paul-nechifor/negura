@@ -66,13 +66,13 @@ public class Negura {
         // Loading the configuration manager.
         ClientConfigManager manager = null;
         try {
-            manager = new ClientConfigManager(configFile);
+            manager = new ClientConfigManager(configFile, this);
         } catch (IOException ex) {
             NeguraLog.severe(ex);
         }
         cm = manager;
 
-        ClientRequestHandler handler =new ClientRequestHandler(this, cm);
+        ClientRequestHandler handler = new ClientRequestHandler(this, cm);
         requestServer = new RequestServer(cm.getServicePort(),
                 cm.getThreadPoolOptions(), handler);
         stateMaintainer = new StateMaintainer(cm);
@@ -101,7 +101,7 @@ public class Negura {
 
         if (cm.getServicePort() == 20000) {
             try {
-                Thread.sleep(30000);
+                Thread.sleep(10000);
                 addDir(new File("/home/p/tmp/negura"), "");
                 JsonObject mesg = Comm.newMessage("trigger-fs-update");
                 Comm.readMessage(cm.getServerAddress(), mesg);
@@ -126,12 +126,16 @@ public class Negura {
         System.exit(0);
     }
 
-    public NeguraFtpServer getFtpServer() {
+    public final NeguraFtpServer getFtpServer() {
         return ftpServer;
     }
 
-    public StateMaintainer getStateMaintainer() {
+    public final StateMaintainer getStateMaintainer() {
         return stateMaintainer;
+    }
+
+    public final RequestServer getRequestServer() {
+        return requestServer;
     }
 
     public void writeFile(String filePath, File output) throws IOException {

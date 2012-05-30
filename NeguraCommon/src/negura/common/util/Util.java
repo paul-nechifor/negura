@@ -25,6 +25,9 @@ public class Util {
     /** All the units that can exist with a long. */
     private static final String[] UNITS = new String[]{"B", "KiB", "MiB", "GiB",
             "TiB", "PiB", "EiB"};
+    private static final long MINUTE = 60;
+    private static final long HOUR = MINUTE * 60;
+    private static final long DAY = HOUR * 24;
 
     private Util() { }
 
@@ -43,6 +46,25 @@ public class Util {
             ret /= 1024;
         }
         return String.format(format, ret, UNITS[UNITS.length - 1]);
+    }
+
+    public static String timeInterval(long seconds) {
+        long copy = seconds;
+
+        long secs = copy % 60;
+        copy /= 60;
+        long mins = copy % 60;
+        copy /= 60;
+        long hours = copy % 24;
+        long days = copy / 24;
+
+        String ret = String.format("%02d:%02d:%02d", hours, mins, secs);
+
+        if (days > 0) {
+            return String.format("%dd %s", days, ret);
+        } else {
+            return ret;
+        }
     }
 
     /**

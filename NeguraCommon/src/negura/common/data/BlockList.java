@@ -174,4 +174,16 @@ public class BlockList {
     public synchronized void haveTempBlock(int blockId) {
         tempBlocks.add(blockId);
     }
+
+    public synchronized int getAllocatedNumber() {
+        return allocatedBlocks.size();
+    }
+
+    public synchronized int getFinishedNumber() {
+        return downloadedBlocks.size();
+    }
+
+    public synchronized int getTempBlocksNumber() {
+        return tempBlocks.size();
+    }
 }
