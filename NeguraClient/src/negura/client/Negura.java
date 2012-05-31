@@ -25,6 +25,8 @@
  * TODO: Put a handler for the exceptions in different threads.
  *
  * TODO: User joins in DataManager.
+ *
+ * TODO: If I register with 700 is shows 350.
  */
 
 package negura.client;
@@ -46,6 +48,7 @@ import negura.client.gui.TrayGui;
 import negura.common.data.Block;
 import negura.common.data.BlockList;
 import negura.common.data.Operation;
+import negura.common.data.TrafficLogger;
 import negura.common.json.Json;
 import negura.common.util.Comm;
 import negura.common.net.RequestServer;
@@ -58,6 +61,7 @@ public class Negura {
     private final RequestServer requestServer;
     private final StateMaintainer stateMaintainer;
     private final NeguraFtpServer ftpServer;
+    private final TrafficLogger trafficLogger;
 
     // This is special. It has to be started in it's own thread.
     private TrayGui trayGui;
@@ -77,12 +81,8 @@ public class Negura {
                 cm.getThreadPoolOptions(), handler);
         stateMaintainer = new StateMaintainer(cm);
         ftpServer = new NeguraFtpServer(cm);
+        trafficLogger = new TrafficLogger(cm.getTrafficAggregator(), 0.5, 120);
     }
-
-
-
-
-    //////////////////////////////////////////////////////////////////////////
 
     public void start() {
         // Starting the tray GUI in it's own thread.
@@ -96,8 +96,6 @@ public class Negura {
 
         requestServer.startInNewThread();
         stateMaintainer.startInNewThread();
-
-
 
         if (cm.getServicePort() == 20000) {
             try {
@@ -113,12 +111,13 @@ public class Negura {
 
     public void shutdown(boolean complain) {
         try {
+            trafficLogger.shutdown();
             requestServer.requestStop();
             trayGui.requestStop();
             cm.save();
-            if (ftpServer != null)
-                ftpServer.requestStop();
-        } catch (Exception ex) {
+            if (ftpServer.isOn())
+                ftpServer.turnOff();
+        } catch (IOException ex) {
             if (complain)
                 NeguraLog.severe(ex);
         }
@@ -136,6 +135,10 @@ public class Negura {
 
     public final RequestServer getRequestServer() {
         return requestServer;
+    }
+
+    public final TrafficLogger getTrafficLogger() {
+        return trafficLogger;
     }
 
     public void writeFile(String filePath, File output) throws IOException {

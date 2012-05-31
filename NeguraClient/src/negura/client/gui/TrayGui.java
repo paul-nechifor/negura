@@ -87,11 +87,11 @@ public class TrayGui extends Service {
             public void handleEvent(Event event) {
                 if (startFtpMi.getSelection()) {
                     NeguraFtpServer ftpServer =  negura.getFtpServer();
-                    ftpServer.start();
+                    ftpServer.turnOn();
                     tip(I18n.get("applicationFtp"), I18n.format("startedOn",
-                            ftpServer.getOpenedOnPort()));
+                            cm.getFtpPort()));
                 } else {
-                    negura.getFtpServer().requestStop();
+                    negura.getFtpServer().turnOff();
                     tip(I18n.get("applicationFtp"), I18n.get("stoppedFtp"));
                 }
             }

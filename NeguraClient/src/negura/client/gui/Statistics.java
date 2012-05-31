@@ -10,6 +10,7 @@ import negura.common.gui.Window;
 import net.miginfocom.swt.MigLayout;
 import org.eclipse.swt.events.ShellEvent;
 import org.eclipse.swt.events.ShellListener;
+import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
@@ -66,6 +67,7 @@ public class Statistics extends Window {
 
     private final Display display;
     private final ClientConfigManager cm;
+    private final ChartWidget chartWidget;
     private final Runnable callUpdateValues = new Runnable() {
         public void run() {
             updateValues();
@@ -120,6 +122,10 @@ public class Statistics extends Window {
         fillGroupWithLabels(othersG,
             RequestThreads
         );
+
+        traficChartG.setLayout(new FillLayout());
+        chartWidget = new ChartWidget(traficChartG,
+                cm.getNegura().getTrafficLogger());
 
         addCallDisposeOnClose();
 
@@ -176,6 +182,8 @@ public class Statistics extends Window {
         AtTime.setText(atStrings[2]);
         AtAvgDown.setText(atStrings[3]);
         AtAvgUp.setText(atStrings[4]);
+
+        chartWidget.redraw();
 
         // Call update again after a period.
         display.timerExec(UPDATE_INTERVAL, callUpdateValues);

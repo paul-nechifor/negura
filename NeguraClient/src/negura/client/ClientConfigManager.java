@@ -119,13 +119,13 @@ public class ClientConfigManager {
 
     // Final objects.
     private final Builder builder;
+    private final TrafficAggregator trafficAggregator;
     private final PeerCache peerCache;
     private final BlockCache blockCache;
     private final BlockList blockList;
     private final NeguraFsView fsView;
     private final Negura negura;
-    private final TrafficAggregator trafficAggregator;
-
+    
     public ClientConfigManager(Builder builder, Negura negura)
             throws IOException {
         // Loading the file log handler as early as possible to log errors.
@@ -146,13 +146,13 @@ public class ClientConfigManager {
         this.logFile = builder.logFile;
 
         // Initializing final objects.
+        this.trafficAggregator = builder.trafficAggregator;
         this.builder = builder;
         this.peerCache = new PeerCache(this);
-        this.blockCache = new BlockCache(this);
+        this.blockCache = new BlockCache(this, trafficAggregator, blockSize);
         this.blockList = builder.blockList;
         this.fsView = new NeguraFsView(this, builder.operations);
         this.negura = negura;
-        this.trafficAggregator = builder.trafficAggregator;
 
         // Special initialization operations.
         this.blockCache.load();

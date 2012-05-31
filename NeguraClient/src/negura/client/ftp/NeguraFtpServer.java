@@ -1,9 +1,11 @@
 package negura.client.ftp;
 
 import java.awt.Desktop;
+import java.io.IOException;
 import java.net.URI;
+import java.net.URISyntaxException;
 import negura.client.ClientConfigManager;
-import negura.common.Service;
+import negura.common.OnOffService;
 import negura.common.util.NeguraLog;
 import org.apache.ftpserver.ConnectionConfigFactory;
 import org.apache.ftpserver.FtpServer;
@@ -15,22 +17,19 @@ import org.apache.ftpserver.ftplet.User;
 import org.apache.ftpserver.listener.ListenerFactory;
 
 /**
- *
+ * TODO: REWRITE THIS
  * @author Paul Nechifor
  */
-public class NeguraFtpServer extends Service {
+public class NeguraFtpServer extends OnOffService {
+    private final ClientConfigManager cm;
     private FtpServer ftpServer;
-    private ClientConfigManager cm;
-    // I save the value so that if it changes while the server is started the
-    // window will still open with the correct port.
-    private int openedOnPort = -1;
 
     public NeguraFtpServer(ClientConfigManager cm) {
         this.cm = cm;
     }
 
-    public void run() {
-        openedOnPort = cm.getFtpPort();
+    @Override
+    protected void turnedOn() {
         FtpServerFactory serverFactory = new FtpServerFactory();
 
         ConnectionConfigFactory config = new ConnectionConfigFactory();
@@ -43,7 +42,7 @@ public class NeguraFtpServer extends Service {
 
         // Replacing the default listener with a custom port.
         ListenerFactory factory = new ListenerFactory();
-        factory.setPort(openedOnPort);
+        factory.setPort(cm.getFtpPort());
         serverFactory.addListener("default", factory.createListener());
 
         // Setting the filesystem view.
@@ -66,33 +65,34 @@ public class NeguraFtpServer extends Service {
     }
 
     @Override
-    public void requestStop() {
-        super.requestStop();
-        if (ftpServer != null && !ftpServer.isStopped())
-            ftpServer.stop();
+    protected void turnedOff() {
+        ftpServer.stop();
     }
     /**
      * Tries to open a browser window to the FTP server location.
      * @return true on success.
      */
     public boolean openBrowserWindow() {
-        if (ftpServer == null || ftpServer.isStopped()
-                || ftpServer.isSuspended() || !Desktop.isDesktopSupported())
+        if (ftpServer.isStopped() || ftpServer.isSuspended() ||
+                !Desktop.isDesktopSupported()) {
             return false;
+        }
+
         Desktop desktop = Desktop.getDesktop();
-        if (!desktop.isSupported(Desktop.Action.BROWSE))
+        if (!desktop.isSupported(Desktop.Action.BROWSE)) {
             return false;
+        }
 
         try {
-            desktop.browse(new URI("ftp://127.0.0.1:" + openedOnPort));
-        } catch (Exception ex) {
+            desktop.browse(new URI("ftp://127.0.0.1:" + cm.getFtpPort()));
+        } catch (URISyntaxException ex) {
+            NeguraLog.warning(ex);
+            return false;
+        } catch (IOException ex) {
+            NeguraLog.warning(ex);
             return false;
         }
 
         return true;
-    }
-
-    public int getOpenedOnPort() {
-        return openedOnPort;
     }
 }

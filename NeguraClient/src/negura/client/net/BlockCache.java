@@ -7,6 +7,7 @@ import java.net.InetSocketAddress;
 import java.util.HashMap;
 import java.util.List;
 import negura.client.ClientConfigManager;
+import negura.common.data.TrafficAggregator;
 import negura.common.util.Comm;
 import negura.common.util.NeguraLog;
 
@@ -15,7 +16,7 @@ import negura.common.util.NeguraLog;
  * @author Paul Nechifor
  */
 public class BlockCache {
-    class BlockData {
+    private static class BlockData {
         byte[] data;
         long lastUsed;
 
@@ -33,18 +34,19 @@ public class BlockCache {
             return new ByteArrayInputStream(data);
         }
     }
-    private ClientConfigManager cm;
-    private HashMap<Integer, BlockData> blocks
-            = new HashMap<Integer, BlockData>();
-    private byte[] buffer;
+    private final ClientConfigManager cm;
+    private final TrafficAggregator trafficAggregator;
+    private final byte[] buffer;
 
-    public BlockCache(ClientConfigManager cm) {
+    public BlockCache(ClientConfigManager cm, TrafficAggregator ta,
+            int blockSize) {
         this.cm = cm;
+        this.trafficAggregator = ta;
+        this.buffer = new byte[blockSize];
     }
 
     // TODO: change how this function is called.
     public void load() {
-        this.buffer = new byte[cm.getBlockSize()];
     }
 
     public InputStream getBlockInputStream(int blockId) throws IOException {
@@ -58,6 +60,7 @@ public class BlockCache {
             int read = Comm.readBlock(buffer, 0, -1, blockId, address);
             NeguraLog.info("Read %d from block %d.", read, blockId);
             if (read > 0) {
+                trafficAggregator.addSessionDown(read);
                 // Got the block.
                 bd = new BlockData(buffer, read);
                 break;

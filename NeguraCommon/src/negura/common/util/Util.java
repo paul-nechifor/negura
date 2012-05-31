@@ -17,6 +17,8 @@ import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collection;
 
+import static negura.common.util.Util.Multiplier.MULTIP;
+
 /**
  * General purpose static utility methods.
  * @author Paul Nechifor
@@ -28,6 +30,26 @@ public class Util {
     private static final long MINUTE = 60;
     private static final long HOUR = MINUTE * 60;
     private static final long DAY = HOUR * 24;
+
+    public static class Multiplier {
+        public static final long B = 1;
+        public static final long KiB = B * 1024;
+        public static final long MiB = KiB * 1024;
+        public static final long GiB = MiB * 1024;
+        public static final long TiB = GiB * 1024;
+        public static final long PiB = TiB * 1024;
+        public static final long EiB = PiB * 1024;
+        public static final long[] MULTIP = new long[] {B, KiB, MiB, GiB, TiB,
+            PiB, EiB};
+
+        public final double size;
+        public final long unit;
+
+        public Multiplier(double size, long unit) {
+            this.size = size;
+            this.unit = unit;
+        }
+    }
 
     private Util() { }
 
@@ -41,11 +63,21 @@ public class Util {
         double ret = bytes;
         String format = "%." + precision + "f %s";
         for (int i = 0; i < UNITS.length; i++) {
-            if (ret < 1024)
+            if (ret < 1024.0)
                 return String.format(format, ret, UNITS[i]);
-            ret /= 1024;
+            ret /= 1024.0;
         }
         return String.format(format, ret, UNITS[UNITS.length - 1]);
+    }
+
+    public static Multiplier bytesWithoutUnit(long bytes) {
+        double ret = bytes;
+        for (int i = 0; i < MULTIP.length; i++) {
+            if (ret < 1024.0)
+                return new Multiplier(ret, MULTIP[i]);
+            ret /= 1024.0;
+        }
+        return new Multiplier(ret, MULTIP[MULTIP.length - 1]);
     }
 
     public static String timeInterval(long seconds) {

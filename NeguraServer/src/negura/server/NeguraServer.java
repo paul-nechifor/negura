@@ -43,7 +43,7 @@ public class NeguraServer {
             }
         }
 
-        announcer.start();
+        announcer.turnOn();
         requestServer.startInNewThread();
 
         try {
@@ -55,7 +55,7 @@ public class NeguraServer {
 
     public void shutdown() {
         requestServer.requestStop();
-        announcer.stop();
+        announcer.turnOff();
         dataManager.shutdown();
     }
 }
