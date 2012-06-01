@@ -13,14 +13,14 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
-import java.security.interfaces.RSAPrivateKey;
-import java.security.interfaces.RSAPublicKey;
 import java.util.Map.Entry;
 import negura.common.data.BlockList;
+import negura.common.data.RsaKeyPair;
 import negura.common.data.TrafficAggregator;
 
 /**
- *
+ * JSON static utility methods.
+ * 
  * @author Paul Nechifor
  */
 public class Json {
@@ -31,16 +31,18 @@ public class Json {
 
     static {
         GsonBuilder builder = new GsonBuilder();
-        builder.registerTypeAdapter(File.class, new FileTypeConverter());
-        builder.registerTypeAdapter(RSAPublicKey.class,
-                new RSAPublicKeyTypeConverter());
-        builder.registerTypeAdapter(RSAPrivateKey.class,
-                new RSAPrivateKeyTypeConverter());
+
+        builder.registerTypeAdapter(File.class,
+                new FileTypeConverter());
         builder.registerTypeAdapter(BlockList.class,
                 new BlockList.TypeConverter());
         builder.registerTypeAdapter(TrafficAggregator.class,
                 new TrafficAggregator.TypeConverter());
+        builder.registerTypeAdapter(RsaKeyPair.class,
+                new RsaKeyPair.TypeConverter());
+
         builder.setFieldNamingPolicy(FieldNamingPolicy.LOWER_CASE_WITH_DASHES);
+
         GSON = builder.create();
     }
 
@@ -60,11 +62,20 @@ public class Json {
     public static String toString(JsonElement jsonElement) {
         return GSON.toJson(jsonElement);
     }
+    
+    private static void toFile(File file, String string) throws IOException {
+        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
+        writer.write(string);
+        writer.close();
+    }
+
+    public static void toFile(File file, JsonElement jsonElement)
+            throws IOException {
+        toFile(file, GSON.toJson(jsonElement));
+    }
 
     public static void toFile(File file, Object object) throws IOException {
-        BufferedWriter writer = new BufferedWriter(new FileWriter(file));
-        writer.write(GSON.toJson(object));
-        writer.close();
+        toFile(file, GSON.toJson(object));
     }
 
     public static <E> E fromReader(Reader reader, Class<E> type) {

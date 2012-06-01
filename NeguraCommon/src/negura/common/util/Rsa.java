@@ -18,25 +18,35 @@ import javax.xml.bind.DatatypeConverter;
  */
 public class Rsa {
     private Rsa() { }
-    
-    public static RSAPublicKey publicKeyFromString(String string) {
+
+    public static RSAPublicKey publicKeyFromBytes(byte[] bytes) {
         try {
-            byte[] bytes = DatatypeConverter.parseBase64Binary(string);
             X509EncodedKeySpec pubKeySpec = new X509EncodedKeySpec(bytes);
             KeyFactory keyFactory = KeyFactory.getInstance("RSA");
             return (RSAPublicKey) keyFactory.generatePublic(pubKeySpec);
-        } catch (Exception e) { }
-        return null;
+        } catch (Exception ex) {
+            NeguraLog.warning(ex);
+            return null;
+        }
+    }
+    
+    public static RSAPublicKey publicKeyFromString(String base64) {
+        return publicKeyFromBytes(DatatypeConverter.parseBase64Binary(base64));
     }
 
-    public static RSAPrivateKey privateKeyFromString(String string) {
+    public static RSAPrivateKey privateKeyFromBytes(byte[] bytes) {
         try {
-            byte[] bytes = DatatypeConverter.parseBase64Binary(string);
             PKCS8EncodedKeySpec pubKeySpec = new PKCS8EncodedKeySpec(bytes);
             KeyFactory keyFactory = KeyFactory.getInstance("RSA");
             return (RSAPrivateKey) keyFactory.generatePrivate(pubKeySpec);
-        } catch (Exception e) { }
-        return null;
+        } catch (Exception ex) {
+            NeguraLog.warning(ex);
+            return null;
+        }
+    }
+
+    public static RSAPrivateKey privateKeyFromString(String base64) {
+        return privateKeyFromBytes(DatatypeConverter.parseBase64Binary(base64));
     }
 
     public static String sign(byte[] bytes, RSAPrivateKey privateKey) {
@@ -68,8 +78,10 @@ public class Rsa {
             KeyPairGenerator keyGen = KeyPairGenerator.getInstance("RSA");
             keyGen.initialize(bits);
             return keyGen.genKeyPair();
-        } catch (NoSuchAlgorithmException ex) { }
-        return null;
+        } catch (NoSuchAlgorithmException ex) {
+            NeguraLog.severe(ex);
+            return null;
+        }
     }
 
     public static String toString(Key key) {

@@ -6,6 +6,9 @@ import negura.client.I18n;
 import negura.client.Negura;
 import negura.client.ftp.NeguraFtpServer;
 import negura.common.Service;
+import negura.common.data.RsaKeyPair;
+import negura.common.gui.KeyGenerationWindow;
+import negura.common.util.MsgBox;
 import negura.common.util.Os;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Image;
@@ -156,6 +159,12 @@ public class TrayGui extends Service {
     }
 
     public void run() {
+        display.syncExec(new Runnable() {
+            public void run() {
+                decryptPrivateKey();
+            }
+        });
+
         while (!mainShell.isDisposed() && continueRunning) {
             if (!display.readAndDispatch()) {
                 display.sleep();
@@ -165,5 +174,19 @@ public class TrayGui extends Service {
         resources.dispose();
         mainShell.dispose();
         display.dispose();
+    }
+
+    private void decryptPrivateKey() {
+        RsaKeyPair keyPair = cm.getKeyPair();
+        if (!keyPair.isPrivateKeyDecrypted()) {
+            boolean successful = KeyGenerationWindow.tryToDecrypt(keyPair,
+                    mainShell, 3);
+
+            if (!successful) {
+                MsgBox.error(mainShell, "The passwords were incorrect. "
+                        + "The program will close.");
+                negura.shutdown(false);
+            }
+        }
     }
 }

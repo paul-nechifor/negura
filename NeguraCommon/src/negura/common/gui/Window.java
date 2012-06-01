@@ -6,11 +6,11 @@ import org.eclipse.swt.graphics.Resource;
 import org.eclipse.swt.widgets.Shell;
 
 /**
+ * An abstract class to expose some shell methods for my windows.
  *
  * @author Paul Nechifor
  */
 public abstract class Window extends Resource {
-    private boolean disposed = false;
     protected final Shell shell;
 
     protected Window(Shell shell) {
@@ -19,13 +19,7 @@ public abstract class Window extends Resource {
 
     @Override
     public void dispose() {
-        if (disposed) {
-            throw new NeguraRunEx("Already disposed.");
-        }
-
         shell.dispose();
-
-        disposed = true;
     }
 
     @Override
@@ -35,7 +29,7 @@ public abstract class Window extends Resource {
 
     @Override
     public final boolean isDisposed() {
-        return disposed;
+        return shell.isDisposed();
     }
 
     public void forceActive() {

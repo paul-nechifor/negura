@@ -54,6 +54,7 @@ import negura.common.util.Comm;
 import negura.common.net.RequestServer;
 import negura.common.util.NeguraLog;
 import negura.common.util.Os;
+import negura.common.util.Sha;
 import negura.common.util.Util;
 
 public class Negura {
@@ -180,7 +181,6 @@ public class Negura {
 
         FileInputStream in = new FileInputStream(file);
         MessageDigest fileHash = MessageDigest.getInstance("SHA-256");
-        MessageDigest blockHash = MessageDigest.getInstance("SHA-256");
         byte[] block = new byte[blockSize];
         int blockReadSize;
 
@@ -189,8 +189,7 @@ public class Negura {
             blockReadSize = in.read(block, 0, blockSize);
 
             // Getting the block hash.
-            blockHash.update(block, 0, blockReadSize);
-            String hash = DatatypeConverter.printHexBinary(blockHash.digest());
+            String hash = Sha.get256(block, 0, blockReadSize);
 
             // Saving the file.
             blockFiles[i] = new File(dirForTempBlocks, hash);

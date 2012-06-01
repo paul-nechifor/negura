@@ -9,26 +9,26 @@ public abstract class OnOffService {
     private boolean isOn = false;
 
     public final void turnOn() {
-        if (isOn) {
+        if (isOn)
             throw new NeguraError("Already on.");
-        }
+
+        onTurnOn();
         isOn = true;
-        turnedOn();
     }
 
     public final void turnOff() {
-        if (!isOn) {
+        if (!isOn)
             throw new NeguraError("Isn't on.");
-        }
+
+        onTurnOff();
         isOn = false;
-        turnedOff();
     }
 
     public boolean isOn() {
         return isOn;
     }
 
-    protected abstract void turnedOn();
+    protected abstract void onTurnOn();
 
-    protected abstract void turnedOff();
+    protected abstract void onTurnOff();
 }

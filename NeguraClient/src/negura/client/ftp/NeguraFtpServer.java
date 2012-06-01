@@ -29,7 +29,7 @@ public class NeguraFtpServer extends OnOffService {
     }
 
     @Override
-    protected void turnedOn() {
+    protected void onTurnOn() {
         FtpServerFactory serverFactory = new FtpServerFactory();
 
         ConnectionConfigFactory config = new ConnectionConfigFactory();
@@ -65,7 +65,7 @@ public class NeguraFtpServer extends OnOffService {
     }
 
     @Override
-    protected void turnedOff() {
+    protected void onTurnOff() {
         ftpServer.stop();
     }
     /**

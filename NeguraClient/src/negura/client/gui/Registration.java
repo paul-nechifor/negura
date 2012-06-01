@@ -5,12 +5,14 @@ import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.security.KeyPair;
+import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import negura.client.ClientConfigManager;
 import negura.client.ClientConfigManager.Builder;
 import negura.client.I18n;
 import negura.common.data.RsaKeyPair;
 import negura.common.data.ServerInfo;
+import negura.common.gui.KeyGenerationWindow;
 import negura.common.gui.Swt;
 import negura.common.json.Json;
 import negura.common.util.Comm;
@@ -58,6 +60,8 @@ public class Registration {
     private InetSocketAddress serverAddress;
     private ServerInfo serverInfo;
     private int minBlocks;
+    private KeyGenerationWindow keyGenerationWindow = null;
+    private RsaKeyPair rsaKeyPair;
     private boolean registeredSuccessfully = false;
 
     public Registration() {
@@ -75,7 +79,7 @@ public class Registration {
 
         // Page one positioning.
         p1 = new Composite(shell, SWT.NONE);
-        p1.setLayout(new MigLayout("insets 10","[grow]"));
+        p1.setLayout(new MigLayout("insets 10","[grow][100::, fill]"));
 
         Label newConnectionL = Swt.newLabel(p1, "wrap 30px",
                 I18n.get("newConnection"));
@@ -83,7 +87,7 @@ public class Registration {
         Swt.newLabel(p1, "wrap", I18n.get("serverAddress"));
         addressT = Swt.newText(p1, "wrap push, w 200!", "127.0.0.1:5000");
 
-        Button continueB = Swt.newButton(p1, "wrap, align right",
+        Button continueB = Swt.newButton(p1, "skip 1",
                 I18n.get("continue"));
 
         // Page one options.
@@ -101,32 +105,39 @@ public class Registration {
 
         // Page two positioning.
         p2 = new Composite(shell, SWT.NONE);
-        p2.setLayout(new MigLayout("insets 10","[right][150!][max]"));
+        p2.setLayout(new MigLayout("insets 10",
+                "[right][grow, fill][grow, fill][100::, fill]"));
 
         Label settingsL = Swt.newLabel(p2, "span, align left, wrap 30px",
                 I18n.get("settings"));
 
         Swt.newLabel(p2, null, I18n.get("serverName"));
-        serverNameValL = Swt.newLabel(p2, "w max, wrap", null);
+        serverNameValL = Swt.newLabel(p2, "span, wrap", null);
 
         Swt.newLabel(p2, null, I18n.get("blockSize"));
-        blockSizeValL = Swt.newLabel(p2, "w max, wrap", null);
+        blockSizeValL = Swt.newLabel(p2, "span, wrap", null);
 
         Swt.newLabel(p2, null, I18n.get("minimumBlocks"));
-        minBlocksValL = Swt.newLabel(p2, "w max, wrap 30px", null);
+        minBlocksValL = Swt.newLabel(p2, "span, wrap 30px", null);
 
         Swt.newLabel(p2, null, I18n.get("blocksToStore"));
 
-        blocksToStoreT = Swt.newText(p2, "w max", null);
-        blocksToStoreS = Swt.newHSlider(p2, "w max, wrap", -1, -1, -1);
+        blocksToStoreT = Swt.newText(p2, null, null);
+        blocksToStoreS = Swt.newHSlider(p2, "span, wrap", -1, -1, -1);
 
         Swt.newLabel(p2, null, I18n.get("usedSpace"));
-        spaceToBeUsedValL = Swt.newLabel(p2, "w max, wrap", null);
+        spaceToBeUsedValL = Swt.newLabel(p2, "span, wrap", null);
 
         Swt.newLabel(p2, null, I18n.get("ftpPort"));
-        ftpPortT = Swt.newText(p2, "w max, wrap push", "43210");
+        ftpPortT = Swt.newText(p2, "wrap", "43210");
 
-        doneB = Swt.newButton(p2, "span, align right", I18n.get("done"));
+        Swt.newLabel(p2, null, "Key pair:");
+        final Text keyT = Swt.newText(p2, "span 2", null);
+        Button loadB = Swt.newButton(p2, "wrap push", "Load");
+
+        Button genB = Swt.newButton(p2, "span 3, align left",
+                "Key pair generator");
+        doneB = Swt.newButton(p2, null, I18n.get("done"));
 
         // Page two options.
         settingsL.setFont(titleFont);
@@ -149,6 +160,23 @@ public class Registration {
             @Override
             public void widgetSelected(SelectionEvent e) {
                 stepThree();
+            }
+        });
+        loadB.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                Object[] ret = KeyGenerationWindow.loadKeyPair(shell);
+                if (ret == null)
+                    return;
+
+                keyT.setText(((File) ret[0]).getAbsolutePath());
+                rsaKeyPair = (RsaKeyPair) ret[1];
+            }
+        });
+        genB.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                openKeyGeneratorWindow();
             }
         });
 
@@ -206,6 +234,14 @@ public class Registration {
         shell.layout();
     }
 
+    private void openKeyGeneratorWindow() {
+        if (keyGenerationWindow == null || keyGenerationWindow.isDisposed()) {
+            keyGenerationWindow = new KeyGenerationWindow(display);
+        } else {
+            keyGenerationWindow.forceActive();
+        }
+    }
+
     private void stepThree() {
         // Verifing that all the supplied data is valid.
         int numberOfBlocks = -1;
@@ -228,6 +264,11 @@ public class Registration {
             return;
         }
 
+        if (rsaKeyPair == null) {
+            MsgBox.warning(shell, "You have to load a key pair.");
+            return;
+        }
+
         // Creating the directories if they need to be created.
         File dataDir = new File(Os.getUserDataDir(),
                 I18n.get("applicationShortName"));
@@ -247,16 +288,14 @@ public class Registration {
         }
         File configFile = new File(configFileDir, "config.json");
 
-        RsaKeyPair rsaKeyPair = new RsaKeyPair();
+        //RsaKeyPair rsaKeyPair = new RsaKeyPair();
         KeyPair keyPair = Rsa.generateKeyPair(1024);
         if (keyPair == null) {
             MsgBox.error(shell, I18n.get("failedRsaKeyPair"));
             shell.dispose();
             return;
         }
-        // TODO: encrypt the private key.
-        rsaKeyPair.publicKey = (RSAPublicKey) keyPair.getPublic();
-        rsaKeyPair.encryptedPrivateKey = "To encrypt later.";
+
 
         JsonObject regMsg = Comm.newMessage("registration");
         regMsg.addProperty("public-key", Rsa.toString(keyPair.getPublic()));
@@ -284,7 +323,7 @@ public class Registration {
 
         Builder builder = new Builder(configFile)
                 .serverAddress(serverAddress)
-                .storedBlocks(serverInfo.minimumBlocks).serverInfo(serverInfo)
+                .storedBlocks(numberOfBlocks).serverInfo(serverInfo)
                 .dataDir(dataDir).userId(uid).servicePort(servicePort)
                 .ftpPort(ftpPort).keyPair(rsaKeyPair).threadPoolOptions(
                 "core-pool-size=0;maximum-pool-size=15;keep-alive-time=30");
@@ -345,11 +384,13 @@ public class Registration {
             NeguraLog.severe(ex);
         }
 
-        RsaKeyPair rsaKeyPair = new RsaKeyPair();
         KeyPair keyPair = Rsa.generateKeyPair(1024);
-        // TODO: encrypt the private key.
-        rsaKeyPair.publicKey = (RSAPublicKey) keyPair.getPublic();
-        rsaKeyPair.encryptedPrivateKey = "To encrypt later.";
+        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
+        String password = "dummyPassword";
+        int repetitions = 1000;
+        RsaKeyPair rsaKeyPair = RsaKeyPair.createNewPair(publicKey, privateKey,
+                password, repetitions);
 
         int storedBlocks = serverInfo.minimumBlocks;
 
@@ -360,7 +401,8 @@ public class Registration {
                 .ftpPort(2220 + code).keyPair(rsaKeyPair);
 
         JsonObject regMsg = Comm.newMessage("registration");
-        regMsg.addProperty("public-key", Rsa.toString(rsaKeyPair.publicKey));
+        regMsg.addProperty("public-key", 
+                Rsa.toString(rsaKeyPair.getPublicKey()));
         regMsg.addProperty("number-of-blocks", storedBlocks);
         regMsg.addProperty("port", port);
 

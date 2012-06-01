@@ -113,6 +113,7 @@ public class ClientConfigManager {
     private final int servicePort;
     private final int ftpPort;
     private final String threadPoolOptions;
+    private final RsaKeyPair keyPair;
     private final int userId;
     private final int blockSize;
     private final File logFile;
@@ -141,6 +142,7 @@ public class ClientConfigManager {
         this.servicePort = builder.servicePort;
         this.ftpPort = builder.ftpPort;
         this.threadPoolOptions = builder.threadPoolOptions;
+        this.keyPair = builder.keyPair;
         this.userId = builder.userId;
         this.blockSize = builder.serverInfo.blockSize;
         this.logFile = builder.logFile;
@@ -215,6 +217,10 @@ public class ClientConfigManager {
 
     public final String getThreadPoolOptions() {
         return threadPoolOptions;
+    }
+
+    public final RsaKeyPair getKeyPair() {
+        return keyPair;
     }
 
     public final int getUserId() {

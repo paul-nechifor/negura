@@ -156,6 +156,13 @@ public class Swt {
         return ret;
     }
 
+    public static Button newCheckBox(Composite c, String layout, String text) {
+        Button ret = n(Button.class, c, SWT.CHECK, layout);
+        if (text != null)
+            ret.setText(text);
+        return ret;
+    }
+
     public static Combo newCombo(Composite c, String layout,
             String[] items, int selected) {
         Combo ret = n(Combo.class, c, SWT.READ_ONLY, layout);
@@ -282,5 +289,17 @@ public class Swt {
                 toDispose.dispose();
             }
         });
+    }
+
+    /**
+     * This method returns when the shell is disposed.
+     * @param display       The display of the shell.
+     * @param shell         The shell for which to wait.
+     */
+    public static void loopUntilClosed(Display display, Shell shell) {
+        while (!shell.isDisposed())
+            if (!display.readAndDispatch())
+                display.sleep();
+        display.dispose();
     }
 }

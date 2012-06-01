@@ -2,12 +2,13 @@ package negura.server;
 
 import java.io.File;
 import java.io.IOException;
-import java.security.interfaces.RSAPrivateKey;
+import negura.common.data.RsaKeyPair;
 import negura.common.data.ServerInfo;
 import negura.common.json.Json;
 
 /**
  * Manages the server configuration.
+ *
  * @author Paul Nechifor
  */
 public class ServerConfigManager {
@@ -21,8 +22,8 @@ public class ServerConfigManager {
         public String databaseUrl;
         public String databaseUser;
         public String databasePassword; // TODO: Change this.
-        public RSAPrivateKey privateKey;
-        public RSAPrivateKey adminPrivateKey;
+        public RsaKeyPair serverKeyPair;
+        public RsaKeyPair adminKeyPair;
         public boolean firstRun;
 
         public Builder(File configFile) {
@@ -74,8 +75,8 @@ public class ServerConfigManager {
         return builder.firstRun;
     }
 
-    public void setFirstRun(boolean firstRun) {
-        builder.firstRun = firstRun;
+    public void setFirstRunOff() {
+        builder.firstRun = false;
     }
 
     public int getVirtualDiskBlocks() {

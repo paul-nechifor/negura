@@ -45,13 +45,13 @@ public class Announcer extends OnOffService {
     }
 
     @Override
-    public void turnedOn() {
+    public void onTurnOn() {
         scheduler.scheduleAtFixedRate(callAnnounceNewBlocks,
                 5, 5, TimeUnit.MINUTES);
     }
 
     @Override
-    public void turnedOff() {
+    public void onTurnOff() {
         scheduler.shutdown();
     }
 

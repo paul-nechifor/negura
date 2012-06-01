@@ -67,6 +67,10 @@ public class Os {
         // Failed to create the file or directory.
         return null;
     }
+
+    public static File getUserHome() {
+        return new File(System.getProperty("user.home"));
+    }
     
     /**
      * Returns the user configuration directory which is specific to the

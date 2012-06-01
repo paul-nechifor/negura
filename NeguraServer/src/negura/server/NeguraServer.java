@@ -37,7 +37,7 @@ public class NeguraServer {
                 dataManager.createTables();
                 dataManager.createOriginalBlocks(cm.getVirtualDiskBlocks());
                 dataManager.initializeSettings(cm.getVirtualDiskBlocks());
-                cm.setFirstRun(false);
+                cm.setFirstRunOff();
             } catch (SQLException ex) {
                 NeguraLog.severe(ex);
             }

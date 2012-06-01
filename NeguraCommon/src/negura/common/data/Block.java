@@ -1,7 +1,6 @@
 package negura.common.data;
 
 /**
- *
  * @author Paul Nechifor
  */
 public class Block {

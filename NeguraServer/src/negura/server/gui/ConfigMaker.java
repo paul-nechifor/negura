@@ -2,12 +2,11 @@ package negura.server.gui;
 
 import java.io.File;
 import java.io.IOException;
-import java.security.KeyPair;
-import java.security.interfaces.RSAPrivateKey;
+import negura.common.data.RsaKeyPair;
+import negura.common.gui.KeyGenerationWindow;
 import negura.common.net.RequestServer;
 import negura.common.gui.Swt;
 import negura.common.util.MsgBox;
-import negura.common.util.Rsa;
 import negura.common.util.Util;
 import negura.server.ServerConfigManager;
 import negura.server.ServerConfigManager.Builder;
@@ -36,13 +35,10 @@ public class ConfigMaker {
     private static final int BLOCK_OPTIONS = 7;
     private static final String[] optionsStr = new String[BLOCK_OPTIONS];
     private static final int[] optionsInt = new int[BLOCK_OPTIONS];
-    private static final int[] keySizeInt = new int[]{1024, 2048};
-    private static final String[] keySizeStr = new String[keySizeInt.length];
 
     private Display display;
     private final Shell shell;
     private final StackLayout stackLayout;
-    private final Font monospacedFont;
     private final Font titleFont;
     private final Composite p1;
     private final Composite p2;
@@ -56,11 +52,9 @@ public class ConfigMaker {
     private final Text databaseUrlT;
     private final Text databaseUserT;
     private final Text databasePasswordT;
+    private KeyGenerationWindow keyGenerationWindow = null;
+    private RsaKeyPair[] keyPair = new RsaKeyPair[2];
     private final Button doneB;
-    private final Text publicKey1T;
-    private final Text privateKey1T;
-    private final Text publicKey2T;
-    private final Text privateKey2T;
     private final Builder builder;
 
     static {
@@ -69,10 +63,6 @@ public class ConfigMaker {
             optionsInt[i] = (int) Math.pow(2, i) * SMALLEST_BLOCK;
             optionsStr[i] = Util.bytesWithUnit(optionsInt[i], 0);
         }
-
-        // Initializing the key size options.
-        for (int i = 0; i < keySizeInt.length; i++)
-            keySizeStr[i] = Integer.toString(keySizeInt[i]);
     }
 
     public ConfigMaker() {
@@ -85,12 +75,10 @@ public class ConfigMaker {
         stackLayout = new StackLayout();
         shell.setLayout(stackLayout);
 
-        monospacedFont = Swt.getMonospacedFont(display, 9);
-        Swt.connectDisposal(shell, monospacedFont);
-
         // Page one positioning. ///////////////////////////////////////////////
         p1 = new Composite(shell, SWT.NONE);
-        p1.setLayout(new MigLayout("insets 10","[right][200!][max]"));
+        p1.setLayout(new MigLayout("insets 10",
+                "[right][200!][max][100::, fill]"));
         Label newConfigL = Swt.newLabel(p1, "span, align left, wrap 30px",
                 "New configuration");
 
@@ -102,7 +90,7 @@ public class ConfigMaker {
 
         Swt.newLabel(p1, null, "Virtual disk blocks:");
         diskBlocksT = Swt.newText(p1, "w max", null);
-        Slider diskBlocksS = Swt.newHSlider(p1, "w max, wrap",
+        Slider diskBlocksS = Swt.newHSlider(p1, "span, w max, wrap",
                 128, 1024, 64);
 
         Swt.newLabel(p1, null, "Virtual disk space:");
@@ -110,7 +98,7 @@ public class ConfigMaker {
 
         Swt.newLabel(p1, null, "Minimum user blocks:");
         minBlocksT = Swt.newText(p1, "w max", null);
-        Slider minBlocksS = Swt.newHSlider(p1, "w max, wrap",
+        Slider minBlocksS = Swt.newHSlider(p1, "span, w max, wrap",
                 128, 1024, 64);
 
         Swt.newLabel(p1, null, "Minimum user space:");
@@ -138,7 +126,7 @@ public class ConfigMaker {
         databasePasswordT = Swt.newPassword(p1, "w max, wrap push",
                 "password");
 
-        Button continueB = Swt.newButton(p1, "span, align right", "Continue");
+        Button continueB = Swt.newButton(p1, "skip 3", "Continue");
 
         // Page one options. ///////////////////////////////////////////////////
         titleFont = Swt.getFontWithDifferentHeight(display,
@@ -181,60 +169,45 @@ public class ConfigMaker {
 
         // Page two positioning. ///////////////////////////////////////////////
         p2 = new Composite(shell, SWT.NONE);
-        p2.setLayout(new MigLayout("insets 10","[right][100px!][max]"));
+        p2.setLayout(new MigLayout("insets 10","[right][grow][100::, fill]"));
         Label newConfig2L = Swt.newLabel(p2, "span, align left, wrap 30px",
                 "New configuration");
 
-        Swt.newLabel(p2, "aligny top", "Public key:");
-        publicKey1T = Swt.newMulti(p2, "span, h 60px!, w max, wrap", null);
+        Swt.newLabel(p2, null, "Server key pair:");
+        final Text key1T = Swt.newText(p2, "w max", null);
+        Button load1B = Swt.newButton(p2, "wrap", "Load");
 
-        Swt.newLabel(p2, "aligny top", "Private key:");
-        privateKey1T = Swt.newMulti(p2, "span, h 90px!, w max, wrap", null);
+        Swt.newLabel(p2, null, "Admin key pair:");
+        final Text key2T = Swt.newText(p2, "w max", null);
+        Button load2B = Swt.newButton(p2, "wrap push", "Load");
 
-        Swt.newLabel(p2, null, "Key size:");
-        final Combo key1SizeC = Swt.newCombo(p2, "w max", keySizeStr, 0);
-        Button generate1B = Swt.newButton(p2, "wrap 25px", "Generate");
+        Button genB = Swt.newButton(p2, "align left", "Key pair generator");
 
-        Swt.newLabel(p2, "aligny top", "Admin public key:");
-        publicKey2T = Swt.newMulti(p2, "span, h 60px!, w max, wrap", null);
-
-        Swt.newLabel(p2, "aligny top", "Admin private key:");
-        privateKey2T = Swt.newMulti(p2, "span, h 90px!, w max, wrap", null);
-
-        Swt.newLabel(p2, null, "Key size:");
-        final Combo key2SizeC = Swt.newCombo(p2, "w max", keySizeStr, 0);
-        Button generate2B = Swt.newButton(p2, "wrap push", "Generate");
-
-        doneB = Swt.newButton(p2, "span, align right", "Done");
+        doneB = Swt.newButton(p2, "skip 1", "Done");
 
         // Page two options. ///////////////////////////////////////////////////
         newConfig2L.setFont(titleFont);
-        publicKey1T.setFont(monospacedFont);
-        privateKey1T.setFont(monospacedFont);
-        publicKey2T.setFont(monospacedFont);
-        privateKey2T.setFont(monospacedFont);
+        key1T.setEditable(false);
+        key2T.setEditable(false);
 
-
-        generate1B.addSelectionListener(new SelectionAdapter() {
+        load1B.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
-                KeyPair pair = Rsa.generateKeyPair(
-                        keySizeInt[key1SizeC.getSelectionIndex()]);
-                publicKey1T.setText(Rsa.toString(pair.getPublic(), 70));
-                privateKey1T.setText(Rsa.toString(pair.getPrivate(), 70));
+                loadKeyPair(key1T, 0);
             }
         });
-
-        generate2B.addSelectionListener(new SelectionAdapter() {
+        load2B.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
-                KeyPair pair = Rsa.generateKeyPair(
-                        keySizeInt[key2SizeC.getSelectionIndex()]);
-                publicKey2T.setText(Rsa.toString(pair.getPublic(), 70));
-                privateKey2T.setText(Rsa.toString(pair.getPrivate(), 70));
+                loadKeyPair(key2T, 1);
             }
         });
-
+        genB.addSelectionListener(new SelectionAdapter() {
+            @Override
+            public void widgetSelected(SelectionEvent e) {
+                openKeyGeneratorWindow();
+            }
+        });
         doneB.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -245,15 +218,13 @@ public class ConfigMaker {
         stackLayout.topControl = p1;
         shell.layout();
         shell.setDefaultButton(continueB);
+
+        Swt.centerShell(shell);
+        shell.open();
     }
 
     public void loopUntilClosed() {
-        Swt.centerShell(shell);
-        shell.open();
-        while (!shell.isDisposed())
-            if (!display.readAndDispatch())
-                display.sleep();
-        display.dispose();
+        Swt.loopUntilClosed(display, shell);
     }
 
     private void step2() {
@@ -282,44 +253,43 @@ public class ConfigMaker {
         shell.layout();
     }
 
+    private void loadKeyPair(Text text, int index) {
+        Object[] ret = KeyGenerationWindow.loadKeyPair(shell);
+        if (ret == null)
+            return;
+
+        text.setText(((File) ret[0]).getAbsolutePath());
+        keyPair[index] = (RsaKeyPair) ret[1];
+    }
+
+    private void openKeyGeneratorWindow() {
+        if (keyGenerationWindow == null || keyGenerationWindow.isDisposed()) {
+            keyGenerationWindow = new KeyGenerationWindow(display);
+        } else {
+            keyGenerationWindow.forceActive();
+        }
+    }
+
     private void step3() {
-        builder.serverInfo.publicKey =
-                Rsa.publicKeyFromString(publicKey1T.getText());
-        builder.serverInfo.adminPublicKey =
-                Rsa.publicKeyFromString(publicKey2T.getText());
-        RSAPrivateKey privateKey1 =
-                Rsa.privateKeyFromString(privateKey1T.getText());
-        RSAPrivateKey privateKey2 =
-                Rsa.privateKeyFromString(privateKey2T.getText());
-
-        if (builder.serverInfo.publicKey == null) {
-            MsgBox.warning(shell, "Public key is invalid.");
+        if (keyPair[0] == null) {
+            MsgBox.warning(shell, "You have to load a server key pair.");
             return;
         }
 
-        if (builder.serverInfo.adminPublicKey == null) {
-            MsgBox.warning(shell, "Admin public key is invalid.");
+        if (keyPair[1] == null) {
+            MsgBox.warning(shell, "You have to load an admin key pair.");
             return;
         }
 
-        if (privateKey1 == null) {
-            MsgBox.warning(shell, "Private key is invalid.");
-            return;
-        }
-
-        if(privateKey2 == null) {
-            MsgBox.warning(shell, "Admin private key is invalid.");
-            return;
-        }
-
-        builder.privateKey = privateKey1;
-        builder.adminPrivateKey = privateKey2;
+        builder.serverKeyPair = keyPair[0];
+        builder.adminKeyPair = keyPair[1];
 
         ServerConfigManager cm = new ServerConfigManager(builder);
         try {
             cm.save();
         } catch (IOException ex) {
-            MsgBox.error(shell, "Failed to save file to " + builder.configFile);
+            shell.setVisible(false);
+            MsgBox.error(shell, "Failed to save file: " + ex.getMessage());
             shell.dispose();
             return;
         }
