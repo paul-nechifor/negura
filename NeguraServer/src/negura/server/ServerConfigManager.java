@@ -4,6 +4,7 @@ import java.io.File;
 import java.io.IOException;
 import negura.common.data.RsaKeyPair;
 import negura.common.data.ServerInfo;
+import negura.common.data.ThreadPoolOptions;
 import negura.common.json.Json;
 
 /**
@@ -18,7 +19,7 @@ public class ServerConfigManager {
         public ServerInfo serverInfo;
         public int virtualDiskBlocks;
         public int port;
-        public String threadPoolOptions;
+        public ThreadPoolOptions threadPoolOptions;
         public String databaseUrl;
         public String databaseUser;
         public String databasePassword; // TODO: Change this.
@@ -67,7 +68,7 @@ public class ServerConfigManager {
         return builder.serverInfo;
     }
 
-    public String getThreadPoolOptions() {
+    public ThreadPoolOptions getThreadPoolOptions() {
         return builder.threadPoolOptions;
     }
 

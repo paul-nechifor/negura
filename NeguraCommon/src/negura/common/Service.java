@@ -1,49 +1,75 @@
 package negura.common;
 
+import negura.common.ex.NeguraError;
+
 /**
- * A Service is a sequence of code that can be run in a new thread (or in the
- * current thread) until a stop is requested. All the methods are synchronized.
+ *
  * @author Paul Nechifor
  */
-public abstract class Service implements Runnable {
-    /**
-     * When this is volatile variable is set to false, the service should try
-     * to stop as soon as possible.
-     */
-    protected volatile boolean continueRunning = false;
+public abstract class Service {
+    protected static final int STOPPED = 1;
+    protected static final int STARTING = 2;
+    protected static final int RUNNING = 3;
+    protected static final int STOPPING = 4;
 
-    /**
-     * Starts the service int a new thread and returns.
-     */
-    public synchronized void startInNewThread() {
-        if (continueRunning)
-            throw new RuntimeException("The service is already started.");
+    protected volatile int serviceState = STOPPED;
 
-        continueRunning = true;
-
-        new Thread(this).start();
+    public final void start() {
+        if (serviceState != STOPPED)
+            throw new NeguraError("Can't start if it isn't stopped.");
+        serviceState = STARTING;
+        onStart();
     }
 
-    /**
-     * Starts the service in this thread and returns when all the processing
-     * ends. This might be because another thread requested it to stop.
-     */
-    public synchronized void start() {
-        if (continueRunning)
-            throw new RuntimeException("The service is already started.");
-
-        continueRunning = true;
-
-        run();
+    protected final void started() {
+        if (serviceState != STARTING)
+            throw new NeguraError("You weren't starting.");
+        serviceState = RUNNING;
     }
 
-    /**
-     * Tells the service to stop as soon as possible.
-     */
-    public synchronized void requestStop() {
-        if (!continueRunning)
-            throw new RuntimeException("The service wasn't started.");
+    public final void stop() {
+        if (serviceState != RUNNING)
+            throw new NeguraError("It isn't running.");
+        serviceState = STOPPING;
+        onStop();
+    }
 
-        continueRunning = false;
+    protected final void stopped() {
+        if (serviceState != STOPPING)
+            throw new NeguraError("You weren't stopping.");
+        serviceState = STOPPED;
+    }
+
+    protected abstract void onStart();
+
+    protected abstract void onStop();
+
+    public final boolean isStopped() {
+        return serviceState == STOPPED;
+    }
+
+    public final boolean isStarting() {
+        return serviceState == STARTING;
+    }
+
+    public final boolean isRunning() {
+        return serviceState == RUNNING;
+    }
+
+    public final boolean isStopping() {
+        return serviceState == STOPPING;
+    }
+
+    public final Thread startInOwnThread() {
+        Runnable runnable = new Runnable() {
+            @Override
+            public void run() {
+                start();
+            }
+        };
+        Thread thread = new Thread(runnable);
+        thread.start();
+
+        return thread;
     }
 }

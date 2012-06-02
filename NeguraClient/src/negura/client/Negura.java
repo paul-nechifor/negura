@@ -1,19 +1,4 @@
 /*
- * Folosesc:
- *  - Apache FtpServer pe partea de client pentru a arăta spre exterior ca un
- *    sistem de fisiere ce poate fi montat.
- *  - PostgreSQL pe artea de server pentru a gestiona toate datele legate de
- *    utilizatori, blocuri și fișiere.
- *  - Connection pool pentru baza de date (commons-dbcp, commons-pool).
- *  - JSON cu pachetul Gson pentru comunicarea între diferitele părți pentru că
- *    e ușor de modificat.
- *  - Thread pool pe partea de client și server pentru răspunderea la cererile
- *    primite din socket-uri.
- *  - SWT pentru a avea o interfată grafică nativă cu tot cu partea din tray.
- *  - MigLayout pentru SWT pentru a descrie interfata mai concis.
- */
-
-/*
  * TODO: I should support both IPv4 and IPv6 addresses.
  *
  * TODO: A user shouldn't be able to choose to store more blocks than there are
@@ -25,14 +10,11 @@
  * TODO: Put a handler for the exceptions in different threads.
  *
  * TODO: User joins in DataManager.
- *
- * TODO: If I register with 700 is shows 350.
  */
 
 package negura.client;
 
 import java.security.NoSuchAlgorithmException;
-import negura.client.net.StateMaintainer;
 import negura.client.net.ClientRequestHandler;
 import negura.client.fs.NeguraFile;
 import negura.client.fs.NeguraFileInputStream;
@@ -45,6 +27,8 @@ import java.security.MessageDigest;
 import javax.xml.bind.DatatypeConverter;
 import negura.client.ftp.NeguraFtpServer;
 import negura.client.gui.TrayGui;
+import negura.client.net.BlockMaintainer;
+import negura.client.net.StateMaintainer;
 import negura.common.data.Block;
 import negura.common.data.BlockList;
 import negura.common.data.Operation;
@@ -61,6 +45,7 @@ public class Negura {
     private final ClientConfigManager cm;
     private final RequestServer requestServer;
     private final StateMaintainer stateMaintainer;
+    private final BlockMaintainer blockMaintainer;
     private final NeguraFtpServer ftpServer;
     private final TrafficLogger trafficLogger;
 
@@ -77,12 +62,15 @@ public class Negura {
         }
         cm = manager;
 
+        trafficLogger = new TrafficLogger(cm.getTrafficAggregator(), 0.5, 120);
         ClientRequestHandler handler = new ClientRequestHandler(this, cm);
         requestServer = new RequestServer(cm.getServicePort(),
                 cm.getThreadPoolOptions(), handler);
-        stateMaintainer = new StateMaintainer(cm);
         ftpServer = new NeguraFtpServer(cm);
-        trafficLogger = new TrafficLogger(cm.getTrafficAggregator(), 0.5, 120);
+        stateMaintainer = new StateMaintainer(cm);
+        blockMaintainer = new BlockMaintainer(cm, stateMaintainer);
+        cm.getBlockList().setOutListener(stateMaintainer);
+        cm.getBlockList().setInListener(blockMaintainer);
     }
 
     public void start() {
@@ -95,8 +83,9 @@ public class Negura {
             }
         }).start();
 
-        requestServer.startInNewThread();
-        stateMaintainer.startInNewThread();
+        requestServer.startInOwnThread();
+        stateMaintainer.start();
+        blockMaintainer.start();
 
         if (cm.getServicePort() == 20000) {
             try {
@@ -110,20 +99,19 @@ public class Negura {
         }
     }
 
-    public void shutdown(boolean complain) {
+    public void shutdown() {
         try {
+            trayGui.stop();
+            blockMaintainer.stop();
+            stateMaintainer.stop();
+            requestServer.stop();
             trafficLogger.shutdown();
-            requestServer.requestStop();
-            trayGui.requestStop();
             cm.save();
-            if (ftpServer.isOn())
-                ftpServer.turnOff();
+            if (ftpServer.isRunning())
+                ftpServer.stop();
         } catch (IOException ex) {
-            if (complain)
-                NeguraLog.severe(ex);
+            NeguraLog.severe(ex);
         }
-        // TODO: see why not all the threads are stopping. Is it the FTP server?
-        System.exit(0);
     }
 
     public final NeguraFtpServer getFtpServer() {
@@ -232,7 +220,7 @@ public class Negura {
                         moveTo);
             }
 
-            blockList.haveTempBlock(blockId);
+            blockList.addToTemporary(blockId);
             blockId++;
         }
 

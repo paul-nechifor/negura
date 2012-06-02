@@ -23,7 +23,7 @@ import static negura.client.gui.Statistics.LabelValue.*;
  */
 public class Statistics extends Window {
      static enum LabelValue {
-        BlocksStored("Stored:"),
+        BlocksStored("To store:"),
         BlocksAllocated("Allocated:"),
         BlocksFinished("Finished:"),
         BlocksTemporary("Temporary:"),

@@ -4,7 +4,6 @@ import java.io.File;
 import negura.client.ClientConfigManager;
 import negura.client.I18n;
 import negura.client.Negura;
-import negura.client.ftp.NeguraFtpServer;
 import negura.common.Service;
 import negura.common.data.RsaKeyPair;
 import negura.common.gui.KeyGenerationWindow;
@@ -27,7 +26,7 @@ import org.eclipse.swt.widgets.TrayItem;
  */
 public class TrayGui extends Service {
     private final Display display;
-    private final Shell mainShell;
+    private final Shell shell;
     private final Negura negura;
     private final ClientConfigManager cm;
     private final TrayItem trayItem;
@@ -41,10 +40,37 @@ public class TrayGui extends Service {
         this.cm = cm;
         this.display = new Display();
         this.resources = new CommonResources(display);
-        this.mainShell = new Shell(display);
+        this.shell = new Shell(display);
         this.trayItem = new TrayItem(display.getSystemTray(), SWT.NONE);
 
         load();
+    }
+
+    protected void onStart() {
+        started();
+
+        display.syncExec(new Runnable() {
+            public void run() {
+                decryptPrivateKey();
+            }
+        });
+
+        while (!shell.isDisposed() && serviceState == RUNNING) {
+            if (!display.readAndDispatch()) {
+                display.sleep();
+            }
+        }
+
+        shell.dispose();
+        resources.dispose();
+        display.dispose();
+    }
+
+    protected void onStop() {
+        // This will mean that the loop will terminate and the other things
+        // will be disposed.
+        shell.dispose();
+        stopped();
     }
 
     private MenuItem n(Menu menu, int type, String name, Image icon) {
@@ -61,11 +87,11 @@ public class TrayGui extends Service {
     }
 
     private void load() {
-        mainShell.setImage(resources.getImage("tray"));
+        shell.setImage(resources.getImage("tray"));
         trayItem.setImage(resources.getImage("tray"));
         trayItem.setToolTipText(I18n.format("servingOn", cm.getServicePort()));
 
-        final Menu menu = new Menu(mainShell, SWT.POP_UP);
+        final Menu menu = new Menu(shell, SWT.POP_UP);
         final MenuItem startFtpMi = n(menu, SWT.CHECK, I18n.get("startFtp"), null);
         startFtpMi.setText(I18n.get("startFtp"));
         MenuItem refreshMi = n(menu, SWT.PUSH, I18n.get("refreshFileSystem"));
@@ -89,12 +115,11 @@ public class TrayGui extends Service {
         startFtpMi.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
                 if (startFtpMi.getSelection()) {
-                    NeguraFtpServer ftpServer =  negura.getFtpServer();
-                    ftpServer.turnOn();
+                    negura.getFtpServer().start();
                     tip(I18n.get("applicationFtp"), I18n.format("startedOn",
                             cm.getFtpPort()));
                 } else {
-                    negura.getFtpServer().turnOff();
+                    negura.getFtpServer().stop();
                     tip(I18n.get("applicationFtp"), I18n.get("stoppedFtp"));
                 }
             }
@@ -116,16 +141,16 @@ public class TrayGui extends Service {
         });
         exitMi.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
-                negura.shutdown(true);
+                negura.shutdown();
             }
         });
         selfDestructMi.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
+                negura.shutdown();
                 Os.removeDirectory(new File(Os.getUserConfigDir(),
                         I18n.get("applicationShortName")));
                 Os.removeDirectory(new File(Os.getUserDataDir(),
                         I18n.get("applicationShortName")));
-                negura.shutdown(false);
             }
         });
     }
@@ -147,7 +172,7 @@ public class TrayGui extends Service {
     }
 
     private void tip(String text, String message) {
-        ToolTip tip = new ToolTip(mainShell,
+        ToolTip tip = new ToolTip(shell,
                 SWT.BALLOON | SWT.ICON_INFORMATION);
         if (text != null)
             tip.setText(text);
@@ -158,35 +183,17 @@ public class TrayGui extends Service {
         tip.setVisible(true);
     }
 
-    public void run() {
-        display.syncExec(new Runnable() {
-            public void run() {
-                decryptPrivateKey();
-            }
-        });
-
-        while (!mainShell.isDisposed() && continueRunning) {
-            if (!display.readAndDispatch()) {
-                display.sleep();
-            }
-        }
-
-        resources.dispose();
-        mainShell.dispose();
-        display.dispose();
-    }
-
     private void decryptPrivateKey() {
         RsaKeyPair keyPair = cm.getKeyPair();
-        if (!keyPair.isPrivateKeyDecrypted()) {
-            boolean successful = KeyGenerationWindow.tryToDecrypt(keyPair,
-                    mainShell, 3);
+        if (keyPair.isPrivateKeyDecrypted())
+            return;
 
-            if (!successful) {
-                MsgBox.error(mainShell, "The passwords were incorrect. "
-                        + "The program will close.");
-                negura.shutdown(false);
-            }
+        boolean success = KeyGenerationWindow.tryToDecrypt(keyPair, shell, 3);
+
+        if (!success) {
+            MsgBox.error(shell, "The passwords were incorrect. "
+                    + "The program will close.");
+            negura.shutdown();
         }
     }
 }

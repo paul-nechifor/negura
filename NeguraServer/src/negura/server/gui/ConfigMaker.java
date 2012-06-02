@@ -3,8 +3,8 @@ package negura.server.gui;
 import java.io.File;
 import java.io.IOException;
 import negura.common.data.RsaKeyPair;
+import negura.common.data.ThreadPoolOptions;
 import negura.common.gui.KeyGenerationWindow;
-import negura.common.net.RequestServer;
 import negura.common.gui.Swt;
 import negura.common.util.MsgBox;
 import negura.common.util.Util;
@@ -113,7 +113,7 @@ public class ConfigMaker {
 
         Swt.newLabel(p1, null, "Thread pool options:");
         threadPoolT = Swt.newText(p1, "span, w max, wrap 25px",
-                "core-pool-size=2;maximum-pool-size=20;keep-alive-time=30");
+                new ThreadPoolOptions(2, 20, 30000).toString());
 
         Swt.newLabel(p1, null, "Database URL:");
         databaseUrlT = Swt.newText(p1, "span, w max",
@@ -237,13 +237,14 @@ public class ConfigMaker {
         builder.port = Integer.parseInt(portT.getText());
         builder.serverInfo.checkInTime =
                 Integer.parseInt(checkInTimeT.getText());
-        builder.threadPoolOptions = threadPoolT.getText();
+        builder.threadPoolOptions = ThreadPoolOptions.fromString(
+                threadPoolT.getText());
         builder.databaseUrl = databaseUrlT.getText();
         builder.databaseUser = databaseUserT.getText();
         builder.databasePassword = databasePasswordT.getText();
         builder.firstRun = true;
 
-        if (RequestServer.fromOptions(builder.threadPoolOptions) == null) {
+        if (builder.threadPoolOptions == null) {
             MsgBox.warning(shell, "The thread pool options are invalid.");
             return;
         }

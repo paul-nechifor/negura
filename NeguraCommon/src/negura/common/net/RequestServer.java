@@ -10,76 +10,36 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import negura.common.Service;
+import negura.common.data.ThreadPoolOptions;
 import negura.common.util.NeguraLog;
 
 /**
- *
  * @author Paul Nechifor
  */
 public class RequestServer extends Service {
-
-    private int port;
-    private RequestHandler handler;
+    private final int port;
+    private final ThreadPoolOptions options;
+    private final RequestHandler handler;
     private ThreadPoolExecutor exec;
     private ServerSocket serverSocket;
 
-    public RequestServer(int port, String threadPoolOptions,
+    public RequestServer(int port, ThreadPoolOptions options,
             RequestHandler handler) {
         this.port = port;
+        this.options = options;
         this.handler = handler;
-        this.exec = fromOptions(threadPoolOptions);
-        if (this.exec == null) {
-            NeguraLog.severe("Error while creating thread pool with options: "
-                    + "'%s'.", threadPoolOptions);
-        }
-    }
-
-    public int getThreadsActive() {
-        return exec.getActiveCount();
-    }
-
-    /**
-     * Returns a ThreadPoolExecutor from the options.
-     * @param options
-     * @return
-     */
-    public static ThreadPoolExecutor fromOptions(String options) {
-        int corePoolSize = -1;
-        int maximumPoolSize = -1;
-        int keepAliveTime = -1;
-
-        for (String option : options.replaceAll("\\s+", "").split(";")) {
-            String[] split = option.split("=");
-            if (split.length != 2)
-                return null;
-            int value = -1;
-            try {
-                value = Integer.parseInt(split[1]);
-            } catch (NumberFormatException ex) { }
-
-            if (split[0].equals("core-pool-size"))
-                corePoolSize = value;
-            else if (split[0].equals("maximum-pool-size"))
-                maximumPoolSize = value;
-            else if (split[0].equals("keep-alive-time"))
-                keepAliveTime = value;
-            else
-                return null;
-        }
-
-        try {
-            BlockingQueue<Runnable> q =
-                    new ArrayBlockingQueue<Runnable>(maximumPoolSize);
-            ThreadPoolExecutor ret = new ThreadPoolExecutor(corePoolSize,
-                    maximumPoolSize, keepAliveTime, TimeUnit.SECONDS, q);
-            return ret;
-        } catch (Exception ex) {
-            return null;
-        }
     }
 
     @Override
-    public void run() {
+    protected void onStart() {
+        BlockingQueue<Runnable> q = new ArrayBlockingQueue<Runnable>(
+                options.getMaximumPoolSize());
+        exec = new ThreadPoolExecutor(
+                options.getCorePoolSize(),
+                options.getMaximumPoolSize(),
+                options.getKeepAliveTimeMillis(),
+                TimeUnit.MILLISECONDS, q);
+
         try {
             serverSocket = new ServerSocket();
             serverSocket.setReuseAddress(true);
@@ -88,9 +48,12 @@ public class RequestServer extends Service {
             NeguraLog.severe(ex, "Could not open the server.");
         }
 
+        // Telling the superclass to change the serviceState.
+        started();
+
         Socket toClose = null;
 
-        while (continueRunning) {
+        while (serviceState == RUNNING) {
             try {
                 final Socket socket = serverSocket.accept();
                 toClose = socket;
@@ -106,37 +69,29 @@ public class RequestServer extends Service {
             } catch (IOException ex) {
                 // This test is necesary because the socket will be forcefully
                 // closed when the program closes.
-                if (continueRunning)
+                if (serviceState == RUNNING)
                     NeguraLog.severe(ex, "Accept failed");
             }
         }
-        
-        // This thread is running out. Wait 5 seconds and if the thread pool
-        // hasn't shut down orderlly, force it to shut down.
 
         exec.shutdown();
-        for (int i = 0; i < 1000; i++) {
-            if (exec.isTerminated())
-                break;
-            
-            try {
-                Thread.sleep(5);
-            } catch (InterruptedException ex) { }
-        }
-        if (!exec.isTerminated())
-            exec.shutdownNow();
+
+        stopped();
     }
 
     @Override
-    public void requestStop() {
-        super.requestStop();
+    protected void onStop() {
+        // Closing the socket. This means it will exit the accept if it was
+        // blocked on it. Note that stopped() is called after exiting that loop
+        // in that thread, not here.
         try {
             serverSocket.close();
         } catch (Exception ex) {
             NeguraLog.warning(ex);
         }
+    }
 
-        // The shutdown of the thread pool is called after the end of this loop
-        // and not by the thread who calls this method.
+    public int getThreadsActive() {
+        return exec.getActiveCount();
     }
 }

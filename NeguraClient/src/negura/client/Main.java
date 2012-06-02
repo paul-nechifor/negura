@@ -6,8 +6,6 @@ import negura.common.util.Comm;
 import negura.common.util.Os;
 import org.apache.ftpserver.ftplet.FtpException;
 
-//Icon from http://www.komodomedia.com/.
-
 /**
  * Main class which manages the command line arguments.
  * @author Paul Nechifor

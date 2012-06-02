@@ -90,6 +90,14 @@ public class Json {
         return ret;
     }
 
+    public static <E> E fromString(String string, Class<E> type) {
+        try {
+            return GSON.fromJson(string, type);
+        } catch (Exception ex) {
+            return null;
+        }
+    }
+
     public static <E> E fromJsonObject(JsonObject object, Class<E> type) {
         return GSON.fromJson(object, type);
     }

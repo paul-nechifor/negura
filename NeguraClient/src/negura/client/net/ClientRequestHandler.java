@@ -74,13 +74,6 @@ public class ClientRequestHandler implements RequestHandler {
         }
     }
 
-    private void handle_block_announce(Socket socket, JsonObject message)
-            throws UnknownHostException, IOException {
-        Comm.writeMessage(socket, new JsonObject());
-        socket.close();
-        negura.getStateMaintainer().triggerBlockListUpdate();
-    }
-
     private void handle_up_block(Socket socket, JsonObject message)
             throws IOException {
         int blockId = message.get("block-id").getAsInt();
@@ -133,6 +126,13 @@ public class ClientRequestHandler implements RequestHandler {
         } catch (IOException ex) {
             NeguraLog.warning(ex);
         }
+    }
+
+    private void handle_block_announce(Socket socket, JsonObject message)
+            throws UnknownHostException, IOException {
+        Comm.writeMessage(socket, new JsonObject());
+        socket.close();
+        negura.getStateMaintainer().triggerBlockListUpdate();
     }
 
     private void handle_filesystem_update(Socket socket, JsonObject message)

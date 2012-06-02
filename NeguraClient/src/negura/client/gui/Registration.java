@@ -12,6 +12,7 @@ import negura.client.ClientConfigManager.Builder;
 import negura.client.I18n;
 import negura.common.data.RsaKeyPair;
 import negura.common.data.ServerInfo;
+import negura.common.data.ThreadPoolOptions;
 import negura.common.gui.KeyGenerationWindow;
 import negura.common.gui.Swt;
 import negura.common.json.Json;
@@ -321,12 +322,16 @@ public class Registration {
         
         int uid = regResp.get("uid").getAsInt();
 
-        Builder builder = new Builder(configFile)
-                .serverAddress(serverAddress)
-                .storedBlocks(numberOfBlocks).serverInfo(serverInfo)
-                .dataDir(dataDir).userId(uid).servicePort(servicePort)
-                .ftpPort(ftpPort).keyPair(rsaKeyPair).threadPoolOptions(
-                "core-pool-size=0;maximum-pool-size=15;keep-alive-time=30");
+        Builder builder = new Builder(configFile);
+        builder.setServerAddress(serverAddress);
+        builder.setStoredBlocks(numberOfBlocks);
+        builder.setServerInfo(serverInfo);
+        builder.setDataDir(dataDir);
+        builder.setUserId(uid);
+        builder.setServicePort(servicePort);
+        builder.setFtpPort(ftpPort);
+        builder.setRsaKeyPair(rsaKeyPair);
+        builder.setThreadPoolOptions(ThreadPoolOptions.getDefault());
 
         ClientConfigManager cm = null;
         try {
@@ -391,14 +396,19 @@ public class Registration {
         int repetitions = 1000;
         RsaKeyPair rsaKeyPair = RsaKeyPair.createNewPair(publicKey, privateKey,
                 password, repetitions);
+        rsaKeyPair.transformToStored(password, rsaKeyPair.getRepetitions() / 4);
 
         int storedBlocks = serverInfo.minimumBlocks;
 
-        Builder builder = new Builder(configFile).serverAddress(serverAddress)
-                .serverInfo(serverInfo).dataDir(dir).servicePort(port)
-                .storedBlocks(storedBlocks).threadPoolOptions(
-                "core-pool-size=0;maximum-pool-size=15;keep-alive-time=30")
-                .ftpPort(2220 + code).keyPair(rsaKeyPair);
+        Builder builder = new Builder(configFile);
+        builder.setServerAddress(serverAddress);
+        builder.setStoredBlocks(storedBlocks);
+        builder.setServerInfo(serverInfo);
+        builder.setDataDir(dir);
+        builder.setServicePort(port);
+        builder.setFtpPort(2220 + code);
+        builder.setRsaKeyPair(rsaKeyPair);
+        builder.setThreadPoolOptions(ThreadPoolOptions.getDefault());
 
         JsonObject regMsg = Comm.newMessage("registration");
         regMsg.addProperty("public-key", 
@@ -419,7 +429,7 @@ public class Registration {
                     regMsgResp.get("registration-failed-reason").getAsString());
         }
 
-        builder.userId(regMsgResp.get("uid").getAsInt());
+        builder.setUserId(regMsgResp.get("uid").getAsInt());
         try {
             builder.build().save();
         } catch (IOException ex) {

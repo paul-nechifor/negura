@@ -5,7 +5,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.net.URISyntaxException;
 import negura.client.ClientConfigManager;
-import negura.common.OnOffService;
+import negura.common.Service;
 import negura.common.util.NeguraLog;
 import org.apache.ftpserver.ConnectionConfigFactory;
 import org.apache.ftpserver.FtpServer;
@@ -17,10 +17,9 @@ import org.apache.ftpserver.ftplet.User;
 import org.apache.ftpserver.listener.ListenerFactory;
 
 /**
- * TODO: REWRITE THIS
  * @author Paul Nechifor
  */
-public class NeguraFtpServer extends OnOffService {
+public class NeguraFtpServer extends Service {
     private final ClientConfigManager cm;
     private FtpServer ftpServer;
 
@@ -29,7 +28,7 @@ public class NeguraFtpServer extends OnOffService {
     }
 
     @Override
-    protected void onTurnOn() {
+    protected void onStart() {
         FtpServerFactory serverFactory = new FtpServerFactory();
 
         ConnectionConfigFactory config = new ConnectionConfigFactory();
@@ -61,13 +60,17 @@ public class NeguraFtpServer extends OnOffService {
             NeguraLog.severe(ex);
         }
 
-        openBrowserWindow();
+        started();
     }
 
     @Override
-    protected void onTurnOff() {
+    protected void onStop() {
         ftpServer.stop();
+        ftpServer = null;
+
+        stopped();
     }
+    
     /**
      * Tries to open a browser window to the FTP server location.
      * @return true on success.

@@ -88,7 +88,7 @@ public class RsaKeyPair {
         return ret;
     }
 
-    public JsonObject toJsonObject() {
+    public final synchronized JsonObject toJsonObject() {
         JsonObject ret = new JsonObject();
         ret.addProperty("public", Rsa.toString(publicKey));
         ret.addProperty("encrypted-private", encryptedPrivateKey);
@@ -108,7 +108,8 @@ public class RsaKeyPair {
      * @param password      The correct password.
      * @param storeReps     How many hashes on the stored version.
      */
-    public final void transformToStored(String password, int storeReps) {
+    public final synchronized void transformToStored(String password,
+            int storeReps) {
         if (!isPrivateKeyDecrypted())
             throw new NeguraError("Key wasn't decrypted first.");
         
@@ -134,7 +135,7 @@ public class RsaKeyPair {
     /**
      * Make to pair not decrypt the private key automatically.
      */
-    public final void transformToNotStored() {
+    public final synchronized void transformToNotStored() {
         if (!stored)
             throw new NeguraError("It wasn't stored to begin with.");
 
@@ -143,7 +144,7 @@ public class RsaKeyPair {
         storedHashPass = null;
     }
 
-    public final boolean isPrivateKeyDecrypted() {
+    public final synchronized boolean isPrivateKeyDecrypted() {
         return privateKey != null;
     }
 
@@ -152,7 +153,7 @@ public class RsaKeyPair {
      * @param password          The text password.
      * @return                  True on success.
      */
-    public final boolean decryptPrivateKey(String password) {
+    public final synchronized boolean decryptPrivateKey(String password) {
         if (isPrivateKeyDecrypted()) {
             throw new NeguraError("Already decrypted.");
         }
@@ -163,14 +164,16 @@ public class RsaKeyPair {
         return isPrivateKeyDecrypted();
     }
 
+    // No need for synchronized.
     public final RSAPublicKey getPublicKey() {
         return publicKey;
     }
 
-    public final RSAPrivateKey getPrivateKey() {
+    public final synchronized RSAPrivateKey getPrivateKey() {
         return privateKey;
     }
 
+    // No need for synchronized.
     public final int getRepetitions() {
         return repetitions;
     }

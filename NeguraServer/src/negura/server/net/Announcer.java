@@ -9,7 +9,7 @@ import java.util.List;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
-import negura.common.OnOffService;
+import negura.common.Service;
 import negura.common.util.Comm;
 import negura.common.util.NeguraLog;
 import negura.common.util.Util;
@@ -20,7 +20,7 @@ import negura.server.DataManager;
  * update.
  * @author Paul Nechifor
  */
-public class Announcer extends OnOffService {
+public class Announcer extends Service {
     private final Runnable callAnnounceNewBlocks = new Runnable() {
         @Override
         public void run() {
@@ -37,22 +37,27 @@ public class Announcer extends OnOffService {
     private final DataManager dataManager;
     private final Object allocatedUsersLock = new Object();
     private HashSet<Integer> allocatedUsers = new HashSet<Integer>();
-    private final ScheduledExecutorService scheduler
-            = Executors.newScheduledThreadPool(1);
+    private ScheduledExecutorService scheduler;
 
     public Announcer(DataManager dataManager) {
         this.dataManager = dataManager;
+
     }
 
     @Override
-    public void onTurnOn() {
+    public void onStart() {
+        scheduler = Executors.newScheduledThreadPool(1);
         scheduler.scheduleAtFixedRate(callAnnounceNewBlocks,
                 5, 5, TimeUnit.MINUTES);
+
+        started();
     }
 
     @Override
-    public void onTurnOff() {
+    public void onStop() {
         scheduler.shutdown();
+
+        stopped();
     }
 
     /**

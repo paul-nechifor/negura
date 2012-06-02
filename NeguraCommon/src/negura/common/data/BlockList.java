@@ -15,6 +15,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import negura.common.ex.NeguraError;
 import negura.common.util.NeguraLog;
 
 /**
@@ -36,7 +37,7 @@ public class BlockList {
             ret.add("allocated", allocatedBlocks);
 
             JsonArray downloadedBlocks = new JsonArray();
-            for (Integer bid : t.downloadedBlocks)
+            for (Integer bid : t.completedBlocks)
                 downloadedBlocks.add(new JsonPrimitive(bid));
             ret.add("downloaded", downloadedBlocks);
 
@@ -60,16 +61,25 @@ public class BlockList {
                 ret.allocatedBlocks.add(e.getAsInt());
             
             for (JsonElement e : obj.getAsJsonArray("downloaded"))
-                ret.downloadedBlocks.add(e.getAsInt());
+                ret.completedBlocks.add(e.getAsInt());
             
             ret.downloadQueue.addAll(ret.allocatedBlocks);
-            ret.downloadQueue.removeAll(ret.downloadedBlocks);
+            ret.downloadQueue.removeAll(ret.completedBlocks);
 
             for (JsonElement e : obj.getAsJsonArray("temp-blocks"))
                 ret.tempBlocks.add(e.getAsInt());
 
             return ret;
         }
+    }
+
+    public interface InListener {
+        void addedBlocks(List<Integer> blockIds);
+        void removedBlocks(List<Integer> blockIds);
+    }
+
+    public interface OutListener {
+        void completedBlock(int blockId);
     }
 
     private int lastOrderId = 0;
@@ -80,15 +90,20 @@ public class BlockList {
     // The blocks which need to be downloaded, in the allocated order.
     private ArrayList<Integer> downloadQueue = new ArrayList<Integer>();
 
-    // The downloaded blocks as a set, for fast lookup.
-    private HashSet<Integer> downloadedBlocks = new HashSet<Integer>();
+    // The completed blocks as a set, for fast lookup.
+    private HashSet<Integer> completedBlocks = new HashSet<Integer>();
 
+    // The completed blocks of which the server isn't aware have been completed.
+    private HashSet<Integer> serverUnawareComplated = new HashSet<Integer>();
+
+    // The temporary blocks that I have.
     private HashSet<Integer> tempBlocks = new HashSet<Integer>();
 
     // These are not saved.
     private transient File downloadedBlockDir;
     private transient File tempBlockDir;
-
+    private transient InListener inListener = null;
+    private transient OutListener outListener = null;
 
     public BlockList() {
     }
@@ -106,12 +121,76 @@ public class BlockList {
         }
     }
 
+    public synchronized void setInListener(InListener inListener) {
+        if (this.inListener != null)
+            throw new NeguraError("Can't have more than one in listener.");
+
+        this.inListener = inListener;
+
+        // Since this is the start tell him all the download queue.
+        if (!downloadQueue.isEmpty())
+            this.inListener.addedBlocks(downloadQueue);
+    }
+
+    public synchronized void setOutListener(OutListener outListener) {
+        if (this.outListener != null)
+            throw new NeguraError("Can't have more than one out listener.");
+
+        this.outListener = outListener;
+
+        // Since this is the start tell him about all the completed blocks
+        // the server isn't aware of.
+        for (Integer blockId : serverUnawareComplated)
+            this.outListener.completedBlock(blockId);
+    }
+
+    public synchronized void addModifications(List<Integer> modifications) {
+        List<Integer> addedBlocks = new ArrayList<Integer>();
+        List<Integer> removedBlocks = new ArrayList<Integer>();
+
+        for (Integer mod : modifications) {
+            if (mod > 0) {
+                addedBlocks.add(mod);
+            } else {
+                removedBlocks.add(-mod);
+            }
+        }
+        allocatedBlocks.removeAll(removedBlocks);
+        downloadQueue.removeAll(removedBlocks);
+        allocatedBlocks.addAll(addedBlocks);
+        downloadQueue.addAll(addedBlocks);
+        lastOrderId += modifications.size();
+
+        if (inListener != null) {
+            inListener.removedBlocks(removedBlocks);
+            inListener.addedBlocks(addedBlocks);
+        }
+    }
+
+    public synchronized void addToCompleted(Integer blockId) {
+        downloadQueue.remove(blockId);
+        completedBlocks.add(blockId);
+        serverUnawareComplated.add(blockId);
+
+        if (outListener != null) {
+            outListener.completedBlock(blockId);
+        }
+    }
+
+    public synchronized void addToServerAwareCompleted(Integer blockId) {
+        serverUnawareComplated.remove(blockId);
+    }
+
+    public synchronized void addToTemporary(int blockId) {
+        tempBlocks.add(blockId);
+    }
+
     public synchronized int getLastOrderId() {
         return lastOrderId;
     }
     
     public synchronized File getBlockFileIfExists(int blockId) {
-        if (downloadedBlocks.contains(blockId)) {
+        if (completedBlocks.contains(blockId)) {
             return getFileToSaveBlockTo(blockId);
         } else if (tempBlocks.contains(blockId)) {
             return getFileToSaveTempBlockTo(blockId);
@@ -128,22 +207,6 @@ public class BlockList {
         return new File(tempBlockDir, Integer.toString(blockId));
     }
 
-    public synchronized boolean isDownloadQueueEmpty() {
-        return downloadQueue.isEmpty();
-    }
-
-    /**
-     * The idea is that you get the state of the download queue as a whole and
-     * try to download them; you might not be able to get them all and then you
-     * should call this method again because new ones might have been added in
-     * the mean time.
-     * @return
-     */
-    @SuppressWarnings("unchecked")
-    public synchronized List<Integer> getDownloadQueue() {
-        return (ArrayList<Integer>) downloadQueue.clone();
-    }
-
     public synchronized boolean isTempBlocksEmpty() {
         return tempBlocks.isEmpty();
     }
@@ -153,34 +216,12 @@ public class BlockList {
         return (HashSet<Integer>) tempBlocks.clone();
     }
 
-    public synchronized void addModifications(List<Integer> modifications) {
-        for (Integer mod : modifications) {
-            if (mod > 0) {
-                allocatedBlocks.add(mod);
-                downloadQueue.add(mod);
-                lastOrderId++;
-            } else {
-                allocatedBlocks.remove(-mod);
-                downloadQueue.remove(-mod);
-            }
-        }
-    }
-
-    public synchronized void haveDownloadedBlock(int blockId) {
-        downloadQueue.remove(new Integer(blockId)); // Damn boxing.
-        downloadedBlocks.add(blockId);
-    }
-
-    public synchronized void haveTempBlock(int blockId) {
-        tempBlocks.add(blockId);
-    }
-
     public synchronized int getAllocatedNumber() {
         return allocatedBlocks.size();
     }
 
     public synchronized int getFinishedNumber() {
-        return downloadedBlocks.size();
+        return completedBlocks.size();
     }
 
     public synchronized int getTempBlocksNumber() {
