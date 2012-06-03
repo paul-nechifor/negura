@@ -147,9 +147,9 @@ public class TrayGui extends Service {
         selfDestructMi.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
                 negura.shutdown();
-                Os.removeDirectory(new File(Os.getUserConfigDir(),
+                Os.removeDirectory(Os.getUserConfigDir(
                         I18n.get("applicationShortName")));
-                Os.removeDirectory(new File(Os.getUserDataDir(),
+                Os.removeDirectory(Os.getUserDataDir(
                         I18n.get("applicationShortName")));
             }
         });

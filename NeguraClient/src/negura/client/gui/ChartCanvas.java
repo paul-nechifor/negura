@@ -10,7 +10,6 @@ import org.eclipse.swt.events.DisposeEvent;
 import org.eclipse.swt.events.DisposeListener;
 import org.eclipse.swt.events.PaintEvent;
 import org.eclipse.swt.events.PaintListener;
-import org.eclipse.swt.graphics.Color;
 import org.eclipse.swt.graphics.Font;
 import org.eclipse.swt.graphics.GC;
 import org.eclipse.swt.graphics.Point;
@@ -22,12 +21,12 @@ import org.eclipse.swt.widgets.Composite;
 /**
  * @author Paul Nechifor
  */
-public class ChartWidget extends Canvas {
+public class ChartCanvas extends Canvas {
     private final Font unitFont;
     private final TrafficLogger trafficLogger;
     private final Record[] trafficRecords;
 
-    public ChartWidget(Composite parent, TrafficLogger trafficLogger) {
+    public ChartCanvas(Composite parent, TrafficLogger trafficLogger) {
         super(parent, SWT.NONE);
 
         this.trafficLogger = trafficLogger;
@@ -39,12 +38,12 @@ public class ChartWidget extends Canvas {
         // Forwarding calls from listeners to private methods.
         addDisposeListener(new DisposeListener() {
             public void widgetDisposed(DisposeEvent e) {
-                ChartWidget.this.widgetDisposed();
+                ChartCanvas.this.widgetDisposed();
             }
         });
         addPaintListener(new PaintListener() {
             public void paintControl(PaintEvent e) {
-                ChartWidget.this.paintControl(e);
+                ChartCanvas.this.paintControl(e);
             }
         });
     }

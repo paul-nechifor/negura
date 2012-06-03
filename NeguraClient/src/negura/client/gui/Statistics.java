@@ -67,7 +67,7 @@ public class Statistics extends Window {
 
     private final Display display;
     private final ClientConfigManager cm;
-    private final ChartWidget chartWidget;
+    private final ChartCanvas chartWidget;
     private final Runnable callUpdateValues = new Runnable() {
         public void run() {
             updateValues();
@@ -124,7 +124,7 @@ public class Statistics extends Window {
         );
 
         traficChartG.setLayout(new FillLayout());
-        chartWidget = new ChartWidget(traficChartG,
+        chartWidget = new ChartCanvas(traficChartG,
                 cm.getNegura().getTrafficLogger());
 
         addCallDisposeOnClose();

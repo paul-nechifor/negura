@@ -75,7 +75,7 @@ public class Os {
     /**
      * Returns the user configuration directory which is specific to the
      * platform.
-     * @return    The configuration directory.
+     * @return              The configuration directory.
      */
     public static File getUserConfigDir() {
         String os = System.getProperty("os.name").toLowerCase();
@@ -105,8 +105,18 @@ public class Os {
     }
 
     /**
+     * Returns the file/dir specified by the path which is relative to the
+     * user's configuration directory.
+     * @param path          The path names.
+     * @return              The File corresponding to it.
+     */
+    public static File getUserConfigDir(String... path) {
+        return join(getUserConfigDir(), path);
+    }
+
+    /**
      * Returns the data directory which is specific to the platform.
-     * @return
+     * @return              The data directory.
      */
     public static File getUserDataDir() {
         String os = System.getProperty("os.name").toLowerCase();
@@ -133,6 +143,16 @@ public class Os {
                 return ret;
         }
         throw new AssertionError("Couldn't get user data dir.");
+    }
+
+    /**
+     * Returns the file/dir specified by the path which is relative to the
+     * user's data directory.
+     * @param path          The path names.
+     * @return              The File corresponding to it.
+     */
+    public static File getUserDataDir(String... path) {
+        return join(getUserDataDir(), path);
     }
 
     /**
@@ -210,5 +230,11 @@ public class Os {
             success = false;
 
         return success;
+    }
+
+    private static File join(File f, String[] strings) {
+        String ret = f.getAbsolutePath() + File.separator
+                + Util.join(strings, File.separator);
+        return new File(ret);
     }
 }

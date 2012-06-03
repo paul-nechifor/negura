@@ -101,17 +101,20 @@ public class Negura {
 
     public void shutdown() {
         try {
-            trayGui.stop();
-            blockMaintainer.stop();
-            stateMaintainer.stop();
-            requestServer.stop();
-            trafficLogger.shutdown();
             cm.save();
-            if (ftpServer.isRunning())
-                ftpServer.stop();
         } catch (IOException ex) {
-            NeguraLog.severe(ex);
+            NeguraLog.severe(ex, "Failed to save the configuration.");
         }
+
+        trayGui.stop();
+        blockMaintainer.stop();
+        stateMaintainer.stop();
+        requestServer.stop();
+        trafficLogger.shutdown();
+        if (ftpServer.isRunning())
+            ftpServer.stop();
+
+        NeguraLog.flushAll();
     }
 
     public final NeguraFtpServer getFtpServer() {
@@ -144,9 +147,9 @@ public class Negura {
             throws NoSuchAlgorithmException, IOException {
         for (File f : dir.listFiles()) {
             if (f.isDirectory())
-                addDir(f, storePath + "/" + f.getName());
+                addDir(f, storePath + File.separator + f.getName());
             else
-                addFile(f, storePath + "/" + f.getName());
+                addFile(f, storePath + File.separator + f.getName());
         }
     }
 

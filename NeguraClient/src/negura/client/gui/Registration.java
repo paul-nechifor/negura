@@ -32,8 +32,8 @@ import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Scale;
 import org.eclipse.swt.widgets.Shell;
-import org.eclipse.swt.widgets.Slider;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.Widget;
 
@@ -54,7 +54,7 @@ public class Registration {
     private final Label blockSizeValL;
     private final Label minBlocksValL;
     private final Text blocksToStoreT;
-    private final Slider blocksToStoreS;
+    private final Scale blocksToStoreS;
     private final Label spaceToBeUsedValL;
     private final Text ftpPortT;
     private final Button doneB;
@@ -124,7 +124,7 @@ public class Registration {
         Swt.newLabel(p2, null, I18n.get("blocksToStore"));
 
         blocksToStoreT = Swt.newText(p2, null, null);
-        blocksToStoreS = Swt.newHSlider(p2, "span, wrap", -1, -1, -1);
+        blocksToStoreS = Swt.newHScale(p2, "span, wrap", -1, -1, -1);
 
         Swt.newLabel(p2, null, I18n.get("usedSpace"));
         spaceToBeUsedValL = Swt.newLabel(p2, "span, wrap", null);
@@ -143,8 +143,8 @@ public class Registration {
         // Page two options.
         settingsL.setFont(titleFont);
         blocksToStoreT.addVerifyListener(Swt.INTEGER_VERIFIER);
-        Swt.connectTo(Swt.TEXT_FROM_SLIDER, blocksToStoreT, blocksToStoreS);
-        Swt.connectTo(Swt.SLIDER_FROM_TEXT, blocksToStoreS, blocksToStoreT);
+        Swt.connectTo(Swt.TEXT_FROM_SCALE, blocksToStoreT, blocksToStoreS);
+        Swt.connectTo(Swt.SCALE_FROM_TEXT, blocksToStoreS, blocksToStoreT);
         Swt.Mod mod = new Swt.Mod() {
             public void modify(Widget to, Widget... from) {
                 Label label = (Label) to;
@@ -271,10 +271,10 @@ public class Registration {
         }
 
         // Creating the directories if they need to be created.
-        File dataDir = new File(Os.getUserDataDir(),
+        File dataDir = Os.getUserDataDir(I18n.get("applicationShortName"));
+        File configFileDir = Os.getUserConfigDir(
                 I18n.get("applicationShortName"));
-        File configFileDir = new File(Os.getUserConfigDir(),
-                I18n.get("applicationShortName"));
+        
         if (!dataDir.exists() && !dataDir.mkdirs()) {
             MsgBox.error(shell, I18n.format("failedDataDir",
                     dataDir.getAbsoluteFile()));

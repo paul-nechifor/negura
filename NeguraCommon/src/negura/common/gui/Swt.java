@@ -16,6 +16,7 @@ import org.eclipse.swt.graphics.FontData;
 import org.eclipse.swt.graphics.Point;
 import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.graphics.Resource;
+import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.widgets.Button;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
@@ -25,8 +26,10 @@ import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.Scale;
 import org.eclipse.swt.widgets.Shell;
-import org.eclipse.swt.widgets.Slider;
+import org.eclipse.swt.widgets.TabFolder;
+import org.eclipse.swt.widgets.TabItem;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.Widget;
 
@@ -44,44 +47,44 @@ public class Swt {
     }
 
     /**
-     * Updates the text when the slider is changed.
+     * Updates the text when the scale is changed.
      */
-    public static final Mod TEXT_FROM_SLIDER = new Mod() {
+    public static final Mod TEXT_FROM_SCALE = new Mod() {
         @Override
         public void modify(Widget to, Widget... from) {
-            if (from.length != 1 || !(from[0] instanceof Slider))
-                throw new InvalidParameterException("from isn't Slider");
+            if (from.length != 1 || !(from[0] instanceof Scale))
+                throw new InvalidParameterException("from isn't Scale");
             if (!(to instanceof Text))
                 throw new InvalidParameterException("to isn't Text");
 
-            Slider slider = (Slider) from[0];
+            Scale scale = (Scale) from[0];
             Text text = (Text) to;
-            int sliderValue = slider.getSelection();
+            int scaleValue = scale.getSelection();
             long textValue = Util.parseLongOrZero(text.getText());
 
-            if (textValue != sliderValue)
-                text.setText(Integer.toString(sliderValue));
+            if (textValue != scaleValue)
+                text.setText(Integer.toString(scaleValue));
         }
     };
 
     /**
-     * Updates the slider selection when the text changes.
+     * Updates the scale selection when the text changes.
      */
-    public static final Mod SLIDER_FROM_TEXT = new Mod() {
+    public static final Mod SCALE_FROM_TEXT = new Mod() {
         @Override
         public void modify(Widget to, Widget... from) {
             if (from.length != 1 || !(from[0] instanceof Text))
                 throw new InvalidParameterException("from isn't Text");
-            if (!(to instanceof Slider))
-                throw new InvalidParameterException("to isn't Slider");
+            if (!(to instanceof Scale))
+                throw new InvalidParameterException("to isn't Scale");
 
-            Slider slider = (Slider) to;
+            Scale scale = (Scale) to;
             Text text = (Text) from[0];
-            int sliderValue = slider.getSelection();
+            int scaleValue = scale.getSelection();
             int textValue = Util.parseIntOrZero(text.getText());
 
-            if (textValue != sliderValue)
-                slider.setSelection(textValue);
+            if (textValue != scaleValue)
+                scale.setSelection(textValue);
         }
     };
 
@@ -127,6 +130,12 @@ public class Swt {
         return ret;
     }
 
+    public static Label newRLabel(Composite c, String layout, String text) {
+        Label ret = n(Label.class, c, SWT.RIGHT, layout);
+        if (text != null)
+            ret.setText(text);
+        return ret;
+    }
     public static Text newText(Composite c, String layout, String text) {
         Text ret = n(Text.class, c, SWT.BORDER, layout);
         if (text != null)
@@ -156,6 +165,18 @@ public class Swt {
         return ret;
     }
 
+    public static Button[] newRadioButton(Composite c, String layout,
+            String[] texts) {
+        Button[] ret = new Button[texts.length];
+
+        for (int i = 0; i < texts.length; i++) {
+            ret[i] = n(Button.class, c, SWT.RADIO, layout);
+            ret[i].setText(texts[i]);
+        }
+
+        return ret;
+    }
+
     public static Button newCheckBox(Composite c, String layout, String text) {
         Button ret = n(Button.class, c, SWT.CHECK, layout);
         if (text != null)
@@ -173,9 +194,9 @@ public class Swt {
         return ret;
     }
 
-    public static Slider newHSlider(Composite c, String layout, int min,
+    public static Scale newHScale(Composite c, String layout, int min,
             int max, int increment) {
-        Slider ret = n(Slider.class, c, SWT.HORIZONTAL, layout);
+        Scale ret = n(Scale.class, c, SWT.HORIZONTAL, layout);
         // The maximum has to be set first because setting the minimum checks to
         // see that it isn't greater than the maximum.
         ret.setMaximum(max);
@@ -188,6 +209,27 @@ public class Swt {
         Group ret = n(Group.class, c, SWT.NONE, layout);
         if (text != null)
             ret.setText(text);
+        return ret;
+    }
+
+    public static TabFolder newTabForder(Composite c, String layout,
+            String[] tabNames) {
+        TabFolder ret = n(TabFolder.class, c, SWT.BORDER, layout);
+        
+        if (tabNames != null && tabNames.length > 0) {
+            for (String tabName : tabNames) {
+                TabItem item = new TabItem(ret, SWT.NONE);
+                item.setText(tabName);
+            }
+        }
+
+        return ret;
+    }
+
+    public static FillLayout singletonLayout(int marginHoriz, int marginVert) {
+        FillLayout ret = new FillLayout();
+        ret.marginWidth = marginHoriz;
+        ret.marginHeight = marginVert;
         return ret;
     }
 
@@ -220,8 +262,8 @@ public class Swt {
                 ((Text) from).addModifyListener(ml);
             } else if (from instanceof Combo) {
                 ((Combo) from).addModifyListener(ml);
-            } else if (from instanceof Slider) {
-                ((Slider) from).addListener(SWT.Selection, l);
+            } else if (from instanceof Scale) {
+                ((Scale) from).addListener(SWT.Selection, l);
             } else throw new AssertionError("Not supported... yet.");
         }
     }

@@ -7,7 +7,7 @@ import negura.common.util.Os;
 import org.apache.ftpserver.ftplet.FtpException;
 
 /**
- * Main class which manages the command line arguments.
+ * Handles the command line arguments and launches then application.
  * @author Paul Nechifor
  */
 public class Main {
@@ -21,8 +21,8 @@ public class Main {
         // If there are no arguments, start with the default configuration file
         // or start the registration.
         if (args.length == 0) {
-            configFile = new File(new File(Os.getUserConfigDir(),
-                    I18n.get("applicationShortName")), "config.json");
+            configFile = Os.getUserConfigDir(I18n.get("applicationShortName"),
+                    "config.json");
             if (!configFile.exists()) {
                 Registration r = new Registration();
                 r.loopUntilClosed();

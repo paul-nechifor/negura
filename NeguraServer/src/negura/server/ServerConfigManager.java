@@ -1,10 +1,12 @@
 package negura.server;
 
+import com.google.gson.JsonSyntaxException;
 import java.io.File;
 import java.io.IOException;
 import negura.common.data.RsaKeyPair;
 import negura.common.data.ServerInfo;
 import negura.common.data.ThreadPoolOptions;
+import negura.common.ex.NeguraEx;
 import negura.common.json.Json;
 
 /**
@@ -33,14 +35,21 @@ public class ServerConfigManager {
         }
     }
 
-    private Builder builder;
+    private final Builder builder;
 
     public ServerConfigManager(Builder builder) {
         this.builder = builder;
     }
 
-    public ServerConfigManager(File configFile) throws IOException {
-        this.builder = Json.fromFile(configFile, Builder.class);
+    public ServerConfigManager(File configFile) throws NeguraEx {
+        try {
+            this.builder = Json.fromFile(configFile, Builder.class);
+        } catch (JsonSyntaxException ex) {
+            throw new NeguraEx("Invalid config file: " + ex.getMessage());
+        } catch (IOException ex) {
+            throw new NeguraEx("Error reading config file: " + ex.getMessage());
+        }
+
         this.builder.configFile = configFile;
     }
 

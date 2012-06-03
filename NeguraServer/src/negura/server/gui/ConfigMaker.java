@@ -21,8 +21,8 @@ import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Label;
+import org.eclipse.swt.widgets.Scale;
 import org.eclipse.swt.widgets.Shell;
-import org.eclipse.swt.widgets.Slider;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.Widget;
 
@@ -65,8 +65,8 @@ public class ConfigMaker {
         }
     }
 
-    public ConfigMaker() {
-        builder = new Builder(new File("server.json"));
+    public ConfigMaker(File configFile) {
+        builder = new Builder(configFile);
 
         display = new Display();
         shell = new Shell(display);
@@ -90,7 +90,7 @@ public class ConfigMaker {
 
         Swt.newLabel(p1, null, "Virtual disk blocks:");
         diskBlocksT = Swt.newText(p1, "w max", null);
-        Slider diskBlocksS = Swt.newHSlider(p1, "span, w max, wrap",
+        Scale diskBlocksS = Swt.newHScale(p1, "span, w max, wrap",
                 128, 1024, 64);
 
         Swt.newLabel(p1, null, "Virtual disk space:");
@@ -98,7 +98,7 @@ public class ConfigMaker {
 
         Swt.newLabel(p1, null, "Minimum user blocks:");
         minBlocksT = Swt.newText(p1, "w max", null);
-        Slider minBlocksS = Swt.newHSlider(p1, "span, w max, wrap",
+        Scale minBlocksS = Swt.newHScale(p1, "span, w max, wrap",
                 128, 1024, 64);
 
         Swt.newLabel(p1, null, "Minimum user space:");
@@ -146,14 +146,14 @@ public class ConfigMaker {
         };
 
         diskBlocksT.addVerifyListener(Swt.INTEGER_VERIFIER);
-        Swt.connectTo(Swt.TEXT_FROM_SLIDER, diskBlocksT, diskBlocksS);
-        Swt.connectTo(Swt.SLIDER_FROM_TEXT, diskBlocksS, diskBlocksT);
+        Swt.connectTo(Swt.TEXT_FROM_SCALE, diskBlocksT, diskBlocksS);
+        Swt.connectTo(Swt.SCALE_FROM_TEXT, diskBlocksS, diskBlocksT);
         Swt.connectTo(tripleConnector, diskSpaceL, blockSizeC, diskBlocksT);
         diskBlocksT.setText("768");
         
         minBlocksT.addVerifyListener(Swt.INTEGER_VERIFIER);
-        Swt.connectTo(Swt.TEXT_FROM_SLIDER, minBlocksT, minBlocksS);
-        Swt.connectTo(Swt.SLIDER_FROM_TEXT, minBlocksS, minBlocksT);
+        Swt.connectTo(Swt.TEXT_FROM_SCALE, minBlocksT, minBlocksS);
+        Swt.connectTo(Swt.SCALE_FROM_TEXT, minBlocksS, minBlocksT);
         Swt.connectTo(tripleConnector, minSpaceL, blockSizeC, minBlocksT);
         minBlocksT.setText("350");
 
@@ -285,12 +285,21 @@ public class ConfigMaker {
         builder.serverKeyPair = keyPair[0];
         builder.adminKeyPair = keyPair[1];
 
+        File parent = builder.configFile.getParentFile();
+        if (!parent.exists() && parent.mkdirs()) {
+            shell.setVisible(false);
+            MsgBox.error(shell, "Failed to create directory: " +
+                    parent.getAbsolutePath());
+            shell.dispose();
+            return;
+        }
+
         ServerConfigManager cm = new ServerConfigManager(builder);
         try {
             cm.save();
         } catch (IOException ex) {
             shell.setVisible(false);
-            MsgBox.error(shell, "Failed to save file: " + ex.getMessage());
+            MsgBox.error(shell, "Failed to save to file: " + ex.getMessage());
             shell.dispose();
             return;
         }

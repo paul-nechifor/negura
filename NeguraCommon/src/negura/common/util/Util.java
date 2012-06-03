@@ -1,5 +1,6 @@
 package negura.common.util;
 
+import negura.common.ex.NeguraError;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.BufferedReader;
@@ -233,5 +234,17 @@ public class Util {
 
         in.close();
         out.close();
+    }
+
+    public static String join(String[] strings, String delimiter) {
+        if (strings == null || strings.length == 0)
+            throw new NeguraError("Can't join 0 strings.");
+
+        StringBuilder builder = new StringBuilder(strings[0]);
+
+        for (int i = 1; i < strings.length; i++)
+            builder.append(delimiter).append(strings[i]);
+
+        return builder.toString();
     }
 }

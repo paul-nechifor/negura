@@ -1,13 +1,11 @@
 package negura.common.gui;
 
-import negura.common.ex.NeguraRunEx;
 import org.eclipse.swt.graphics.Device;
 import org.eclipse.swt.graphics.Resource;
 import org.eclipse.swt.widgets.Shell;
 
 /**
  * An abstract class to expose some shell methods for my windows.
- *
  * @author Paul Nechifor
  */
 public abstract class Window extends Resource {
