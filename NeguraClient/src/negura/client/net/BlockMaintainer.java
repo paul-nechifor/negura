@@ -6,10 +6,10 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -66,14 +66,19 @@ public class BlockMaintainer extends Service implements BlockList.InListener {
         // Load peers for these blocks early.
         peerCache.preemptivelyCache(blockIds);
 
-        // If some of the blocks that were allocated to me are in my temp blocks
-        // copy them instead of downloading them.
         if (!blockList.isTempBlocksEmpty()) {
-            copyFromTempBlocksIfPresent();
+            copyFromTempBlocksIfPresent(blockList.getTempBlocks());
         }
 
         // If the scheduler was off, restart it.
         restartScheduler();
+    }
+
+    @Override
+    public void addedTempBlocks(List<Integer> blockIds) {
+        // If some of the blocks that were allocated to me are in my temp blocks
+        // copy them instead of downloading them.
+        copyFromTempBlocksIfPresent(blockIds);
     }
 
     @Override
@@ -185,9 +190,7 @@ public class BlockMaintainer extends Service implements BlockList.InListener {
         }
     }
 
-    private void copyFromTempBlocksIfPresent() {
-        Set<Integer> tempBlocks = blockList.getTempBlocks();
-
+    private void copyFromTempBlocksIfPresent(Collection<Integer> tempBlocks) {
         // Find out which of the allocated ones are in my temp blocks and
         // remove them from the queue.
         ArrayList<Integer> canCopy = new ArrayList<Integer>();

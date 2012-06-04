@@ -14,7 +14,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.util.Map.Entry;
-import negura.common.data.BlockList;
 import negura.common.data.RsaKeyPair;
 import negura.common.data.TrafficAggregator;
 
@@ -34,8 +33,6 @@ public class Json {
 
         builder.registerTypeAdapter(File.class,
                 new FileTypeConverter());
-        builder.registerTypeAdapter(BlockList.class,
-                new BlockList.TypeConverter());
         builder.registerTypeAdapter(TrafficAggregator.class,
                 new TrafficAggregator.TypeConverter());
         builder.registerTypeAdapter(RsaKeyPair.class,

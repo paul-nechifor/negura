@@ -1,13 +1,9 @@
 package negura.client.gui;
 
-import java.io.File;
 import negura.client.ClientConfigManager;
 import negura.client.I18n;
 import negura.client.Negura;
 import negura.common.Service;
-import negura.common.data.RsaKeyPair;
-import negura.common.gui.KeyGenerationWindow;
-import negura.common.util.MsgBox;
 import negura.common.util.Os;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.graphics.Image;
@@ -34,6 +30,7 @@ public class TrayGui extends Service {
 
     private LogWindow logWindow = null;
     private Statistics statistics = null;
+    private FileAdder fileAdder = null;
 
     public TrayGui(Negura negura, ClientConfigManager cm) {
         this.negura = negura;
@@ -91,6 +88,7 @@ public class TrayGui extends Service {
         MenuItem refreshMi = n(menu, SWT.PUSH, I18n.get("refreshFileSystem"));
         MenuItem viewLogMi = n(menu, SWT.PUSH, I18n.get("openLog"));
         MenuItem statisticsMi = n(menu, SWT.PUSH, "Statistics");
+        MenuItem addFilesMi = n(menu, SWT.PUSH, "Add files");
         n(menu, SWT.SEPARATOR, null);
         MenuItem exitMi = n(menu, SWT.PUSH, I18n.get("exit"),
                 resources.getImage("exit"));
@@ -133,6 +131,11 @@ public class TrayGui extends Service {
                 openStatisticsWindow();
             }
         });
+        addFilesMi.addListener(SWT.Selection, new Listener() {
+            public void handleEvent(Event event) {
+                openFileAdder();
+            }
+        });
         exitMi.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
                 negura.shutdown();
@@ -162,6 +165,14 @@ public class TrayGui extends Service {
             statistics = new Statistics(display, resources, cm);
         } else {
             statistics.forceActive();
+        }
+    }
+
+    private synchronized void openFileAdder() {
+        if (fileAdder == null || fileAdder.isDisposed()) {
+            fileAdder = new FileAdder(display, resources, cm);
+        } else {
+            fileAdder.forceActive();
         }
     }
 

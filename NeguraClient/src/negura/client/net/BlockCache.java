@@ -4,7 +4,6 @@ import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.InetSocketAddress;
-import java.util.HashMap;
 import java.util.List;
 import negura.client.ClientConfigManager;
 import negura.common.data.TrafficAggregator;
@@ -34,6 +33,7 @@ public class BlockCache {
             return new ByteArrayInputStream(data);
         }
     }
+    
     private final ClientConfigManager cm;
     private final TrafficAggregator trafficAggregator;
     private final byte[] buffer;
@@ -43,10 +43,6 @@ public class BlockCache {
         this.cm = cm;
         this.trafficAggregator = ta;
         this.buffer = new byte[blockSize];
-    }
-
-    // TODO: change how this function is called.
-    public void load() {
     }
 
     public InputStream getBlockInputStream(int blockId) throws IOException {

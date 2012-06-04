@@ -133,22 +133,37 @@ public class ServerRequestHandler implements RequestHandler {
 
     private void handle_add_operation(Socket socket, JsonObject message)
             throws IOException, SQLException, NeguraEx {
-        Operation op = Json.fromJsonObject(
-                message.get("operation").getAsJsonObject(), Operation.class);
-        op.signature = "generated signature";
-        op.date = (int) (System.currentTimeMillis() / 1000);
-        int creatorId = message.get("uid").getAsInt();
+        List<Operation> operations = new ArrayList<Operation>();
 
+        for (JsonElement e : message.getAsJsonArray("operations")) {
+            operations.add(Json.fromJsonObject(e.getAsJsonObject(),
+                    Operation.class));
+        }
+
+        int creatorId = message.get("uid").getAsInt();
         List<Integer> allocatedUsers = new ArrayList<Integer>();
-        int firstBlockId = dataManager.insertOperationAndAllocate(op, creatorId,
-                allocatedUsers);
+        List<Integer> firstBlockIds = new ArrayList<Integer>();
+
+        for (Operation op : operations) {
+            firstBlockIds.add(addOperation(op, creatorId, allocatedUsers));
+        }
 
         JsonObject resp = Comm.newMessage();
-        resp.addProperty("first-block-id", firstBlockId);
+        resp.add("first-block-ids", Json.toJsonElement(firstBlockIds));
         Comm.writeMessage(socket, resp);
         socket.close();
 
+        announcer.triggerSendNewOperations();
         announcer.addNewAllocatedUsers(allocatedUsers);
+    }
+
+    private int addOperation(Operation op, int creatorId,
+            List<Integer> allocatedUsers) throws SQLException, NeguraEx {
+        op.signature = "generated signature";
+        op.date = (int) (System.currentTimeMillis() / 1000);
+
+        return dataManager.insertOperationAndAllocate(op, creatorId,
+                allocatedUsers);
     }
 
     private void handle_peers_for_blocks(Socket socket, JsonObject message)

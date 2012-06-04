@@ -26,6 +26,7 @@ import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Group;
 import org.eclipse.swt.widgets.Label;
 import org.eclipse.swt.widgets.Listener;
+import org.eclipse.swt.widgets.ProgressBar;
 import org.eclipse.swt.widgets.Scale;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.TabFolder;
@@ -204,6 +205,14 @@ public class Swt {
         ret.setMaximum(max);
         ret.setMinimum(min);
         ret.setIncrement(increment);
+        return ret;
+    }
+
+    public static ProgressBar newHProgressBar(Composite c, String layout,
+            int min, int max) {
+        ProgressBar ret = n(ProgressBar.class, c, SWT.HORIZONTAL, layout);
+        ret.setMaximum(max);
+        ret.setMinimum(min);
         return ret;
     }
 

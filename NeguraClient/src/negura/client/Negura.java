@@ -14,23 +14,21 @@
 
 package negura.client;
 
+import com.google.gson.JsonElement;
 import java.security.NoSuchAlgorithmException;
 import negura.client.net.ClientRequestHandler;
 import negura.client.fs.NeguraFile;
 import negura.client.fs.NeguraFileInputStream;
 import com.google.gson.JsonObject;
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.security.MessageDigest;
-import javax.xml.bind.DatatypeConverter;
+import java.util.ArrayList;
+import java.util.List;
 import negura.client.ftp.NeguraFtpServer;
 import negura.client.gui.TrayGui;
 import negura.client.net.BlockMaintainer;
 import negura.client.net.StateMaintainer;
-import negura.common.data.Block;
-import negura.common.data.BlockList;
 import negura.common.data.Operation;
 import negura.common.data.RsaKeyPair;
 import negura.common.data.TrafficLogger;
@@ -40,8 +38,6 @@ import negura.common.json.Json;
 import negura.common.util.Comm;
 import negura.common.net.RequestServer;
 import negura.common.util.NeguraLog;
-import negura.common.util.Os;
-import negura.common.util.Sha;
 import negura.common.util.Util;
 
 public class Negura {
@@ -172,82 +168,99 @@ public class Negura {
 
     public void addFile(File file, String storePath)
             throws NoSuchAlgorithmException, IOException {
-        NeguraLog.info("Adding file '%s' as '%s'.", file.getAbsoluteFile(),
-                storePath);
+//        NeguraLog.info("Adding file '%s' as '%s'.", file.getAbsoluteFile(),
+//                storePath);
+//
+//        // The blocks will be saved here by block hash and then moved to the
+//        // temp block dir.
+//        File dirForTempBlocks = Os.createRandomFile(cm.getDataDir(),
+//                Os.FileType.DIR, null, null);
+//
+//        BlockList blockList = cm.getBlockList();
+//        int blockSize = cm.getBlockSize();
+//        long fileSize = file.length();
+//        int nrBlocks = (int) Math.ceil((double) fileSize / blockSize);
+//        Block[] blocks = new Block[nrBlocks];
+//        File[] blockFiles = new File[nrBlocks];
+//
+//        FileInputStream in = new FileInputStream(file);
+//        MessageDigest fileHash = MessageDigest.getInstance("SHA-256");
+//        byte[] block = new byte[blockSize];
+//        int blockReadSize;
+//
+//        for (int i = 0; i < blocks.length; i++) {
+//            // Reading the block.
+//            blockReadSize = in.read(block, 0, blockSize);
+//
+//            // Getting the block hash.
+//            String hash = Sha.get256(block, 0, blockReadSize);
+//
+//            // Saving the file.
+//            blockFiles[i] = new File(dirForTempBlocks, hash);
+//            FileOutputStream out = new FileOutputStream(blockFiles[i]);
+//            out.write(block, 0, blockReadSize);
+//            out.close();
+//
+//            // Update file hash.
+//            fileHash.update(block, 0, blockReadSize);
+//
+//            blocks[i] = new Block(0, hash);
+//        }
+//
+//        in.close();
+//
+//        Operation op = new Operation();
+//        op.type = "add";
+//        op.path = storePath;
+//        op.size = fileSize;
+//        op.blocks = blocks;
+//        op.hash = DatatypeConverter.printHexBinary(fileHash.digest());
+//        op.signature = "my signature. this will be changed by the server";
+//
+//        JsonObject mesg = Comm.newMessage("add-operation");
+//        mesg.addProperty("uid", cm.getUserId());
+//        mesg.add("operation", Json.toJsonElement(op));
+//        JsonObject resp = Comm.readMessage(cm.getServerAddress(), mesg);
+//        int firstBlockId = resp.get("first-block-id").getAsInt();
+//
+//        // Moving the blocks to the temp dir and registering their presence.
+//        int blockId = firstBlockId;
+//        File moveTo;
+//        boolean moved;
+//        for (int i = 0; i < blocks.length; i++) {
+//            moveTo = blockList.getFileToSaveTempBlockTo(blockId);
+//            moved = blockFiles[i].renameTo(moveTo);
+//
+//            if (!moved) {
+//                NeguraLog.severe("Failed to move '%s' to '%s'.", blockFiles[i],
+//                        moveTo);
+//            }
+//
+//            blockList.addToTemporary(blockId);
+//            blockId++;
+//        }
+//
+//        // Removing the temp-temp dir.
+//        if (!dirForTempBlocks.delete()) {
+//            NeguraLog.warning("Failed to delete '%s'.",
+//                    dirForTempBlocks.getAbsoluteFile());
+//        }
+    }
 
-        // The blocks will be saved here by block hash and then moved to the
-        // temp block dir.
-        File dirForTempBlocks = Os.createRandomFile(cm.getDataDir(),
-                Os.FileType.DIR, null, null);
-
-        BlockList blockList = cm.getBlockList();
-        int blockSize = cm.getBlockSize();
-        long fileSize = file.length();
-        int nrBlocks = (int) Math.ceil((double) fileSize / blockSize);
-        Block[] blocks = new Block[nrBlocks];
-        File[] blockFiles = new File[nrBlocks];
-
-        FileInputStream in = new FileInputStream(file);
-        MessageDigest fileHash = MessageDigest.getInstance("SHA-256");
-        byte[] block = new byte[blockSize];
-        int blockReadSize;
-
-        for (int i = 0; i < blocks.length; i++) {
-            // Reading the block.
-            blockReadSize = in.read(block, 0, blockSize);
-
-            // Getting the block hash.
-            String hash = Sha.get256(block, 0, blockReadSize);
-
-            // Saving the file.
-            blockFiles[i] = new File(dirForTempBlocks, hash);
-            FileOutputStream out = new FileOutputStream(blockFiles[i]);
-            out.write(block, 0, blockReadSize);
-            out.close();
-
-            // Update file hash.
-            fileHash.update(block, 0, blockReadSize);
-
-            blocks[i] = new Block(0, hash);
-        }
-
-        in.close();
-
-        Operation op = new Operation();
-        op.type = "add";
-        op.path = storePath;
-        op.size = fileSize;
-        op.blocks = blocks;
-        op.hash = DatatypeConverter.printHexBinary(fileHash.digest());
-        op.signature = "my signature. this will be changed by the server";
-
+    public List<Integer> uploadOperations(ArrayList<Operation> operations)
+            throws IOException {
         JsonObject mesg = Comm.newMessage("add-operation");
         mesg.addProperty("uid", cm.getUserId());
-        mesg.add("operation", Json.toJsonElement(op));
+        mesg.add("operations", Json.toJsonElement(operations));
+
         JsonObject resp = Comm.readMessage(cm.getServerAddress(), mesg);
-        int firstBlockId = resp.get("first-block-id").getAsInt();
 
-        // Moving the blocks to the temp dir and registering their presence.
-        int blockId = firstBlockId;
-        File moveTo;
-        boolean moved;
-        for (int i = 0; i < blocks.length; i++) {
-            moveTo = blockList.getFileToSaveTempBlockTo(blockId);
-            moved = blockFiles[i].renameTo(moveTo);
-            
-            if (!moved) {
-                NeguraLog.severe("Failed to move '%s' to '%s'.", blockFiles[i],
-                        moveTo);
-            }
+        List<Integer> firstBlockIds = new ArrayList<Integer>();
 
-            blockList.addToTemporary(blockId);
-            blockId++;
+        for (JsonElement e : resp.getAsJsonArray("first-block-ids")) {
+            firstBlockIds.add(e.getAsInt());
         }
 
-        // Removing the temp-temp dir.
-        if (!dirForTempBlocks.delete()) {
-            NeguraLog.warning("Failed to delete '%s'.",
-                    dirForTempBlocks.getAbsoluteFile());
-        }
+        return firstBlockIds;
     }
 }

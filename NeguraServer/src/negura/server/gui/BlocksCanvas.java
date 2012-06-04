@@ -2,7 +2,6 @@ package negura.server.gui;
 
 import java.util.List;
 import negura.common.data.BlockInfo;
-import negura.common.util.NeguraLog;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.DisposeEvent;
 import org.eclipse.swt.events.DisposeListener;

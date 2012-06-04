@@ -1,16 +1,6 @@
 package negura.common.data;
 
-import com.google.gson.JsonArray;
-import com.google.gson.JsonDeserializationContext;
-import com.google.gson.JsonDeserializer;
-import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
-import com.google.gson.JsonParseException;
-import com.google.gson.JsonPrimitive;
-import com.google.gson.JsonSerializationContext;
-import com.google.gson.JsonSerializer;
 import java.io.File;
-import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -23,58 +13,17 @@ import negura.common.util.NeguraLog;
  * @author Paul Nechifor
  */
 public class BlockList {
-    public static class TypeConverter implements JsonSerializer<BlockList>,
-            JsonDeserializer<BlockList> {
-        @Override
-        public JsonElement serialize(BlockList t, Type type,
-                JsonSerializationContext jsc) {
-            JsonObject ret = new JsonObject();
-            ret.addProperty("last-order-id", t.lastOrderId);
-
-            JsonArray allocatedBlocks = new JsonArray();
-            for (Integer bid : t.allocatedBlocks)
-                allocatedBlocks.add(new JsonPrimitive(bid));
-            ret.add("allocated", allocatedBlocks);
-
-            JsonArray downloadedBlocks = new JsonArray();
-            for (Integer bid : t.completedBlocks)
-                downloadedBlocks.add(new JsonPrimitive(bid));
-            ret.add("downloaded", downloadedBlocks);
-
-            JsonArray tempBlocks = new JsonArray();
-            for (Integer bid : t.tempBlocks)
-                tempBlocks.add(new JsonPrimitive(bid));
-            ret.add("temp-blocks", tempBlocks);
-
-            return ret;
-        }
-
-        @Override
-        public BlockList deserialize(JsonElement je, Type type,
-                JsonDeserializationContext jdc) throws JsonParseException {
-            BlockList ret = new BlockList();
-            JsonObject obj = je.getAsJsonObject();
-
-            ret.lastOrderId = obj.get("last-order-id").getAsInt();
-
-            for (JsonElement e : obj.getAsJsonArray("allocated"))
-                ret.allocatedBlocks.add(e.getAsInt());
-            
-            for (JsonElement e : obj.getAsJsonArray("downloaded"))
-                ret.completedBlocks.add(e.getAsInt());
-            
-            ret.downloadQueue.addAll(ret.allocatedBlocks);
-            ret.downloadQueue.removeAll(ret.completedBlocks);
-
-            for (JsonElement e : obj.getAsJsonArray("temp-blocks"))
-                ret.tempBlocks.add(e.getAsInt());
-
-            return ret;
-        }
+    public static class Builder {
+        public int lastOrderId = 0;
+        public ArrayList<Integer> allocated = new ArrayList<Integer>();
+        public HashSet<Integer> completed = new HashSet<Integer>();
+        public HashSet<Integer> serverUnawareCompleted = new HashSet<Integer>();
+        public HashSet<Integer> tempBlocks = new HashSet<Integer>();
     }
 
     public interface InListener {
         void addedBlocks(List<Integer> blockIds);
+        void addedTempBlocks(List<Integer> blockIds);
         void removedBlocks(List<Integer> blockIds);
     }
 
@@ -82,33 +31,40 @@ public class BlockList {
         void completedBlock(int blockId);
     }
 
-    private int lastOrderId = 0;
+    private int lastOrderId;
 
     // The allocated blocks memorized in order.
-    private ArrayList<Integer> allocatedBlocks = new ArrayList<Integer>();
-
-    // The blocks which need to be downloaded, in the allocated order.
-    private ArrayList<Integer> downloadQueue = new ArrayList<Integer>();
+    private final ArrayList<Integer> allocatedBlocks;
 
     // The completed blocks as a set, for fast lookup.
-    private HashSet<Integer> completedBlocks = new HashSet<Integer>();
+    private final HashSet<Integer> completedBlocks;
 
     // The completed blocks of which the server isn't aware have been completed.
-    private HashSet<Integer> serverUnawareComplated = new HashSet<Integer>();
+    private final HashSet<Integer> serverUnawareComplated;
 
     // The temporary blocks that I have.
-    private HashSet<Integer> tempBlocks = new HashSet<Integer>();
+    private final HashSet<Integer> tempBlocks;
+
+    // The blocks which need to be downloaded, in the allocated order.
+    private final ArrayList<Integer> downloadQueue;
 
     // These are not saved.
-    private transient File downloadedBlockDir;
-    private transient File tempBlockDir;
-    private transient InListener inListener = null;
-    private transient OutListener outListener = null;
+    private final File downloadedBlockDir;
+    private final File tempBlockDir;
+    private InListener inListener = null;
+    private OutListener outListener = null;
 
-    public BlockList() {
-    }
+    public BlockList(Builder builder, File dataDir) {
+        lastOrderId = builder.lastOrderId;
+        allocatedBlocks = builder.allocated;
+        completedBlocks = builder.completed;
+        serverUnawareComplated = builder.serverUnawareCompleted;
+        tempBlocks = builder.tempBlocks;
 
-    public synchronized void setDataDir(File dataDir) {
+        downloadQueue = new ArrayList<Integer>(allocatedBlocks);
+        downloadQueue.removeAll(completedBlocks);
+
+        // Initalizing directories.
         downloadedBlockDir = new File(dataDir, "blocks");
         tempBlockDir = new File(dataDir, "temp_blocks");
 
@@ -181,12 +137,28 @@ public class BlockList {
         serverUnawareComplated.remove(blockId);
     }
 
-    public synchronized void addToTemporary(int blockId) {
-        tempBlocks.add(blockId);
+    public synchronized void addToTemporary(List<Integer> blockIds) {
+        tempBlocks.addAll(blockIds);
+
+        if (inListener != null) {
+            inListener.addedTempBlocks(blockIds);
+        }
     }
 
     public synchronized int getLastOrderId() {
         return lastOrderId;
+    }
+
+    public synchronized Builder toBuilder() {
+        Builder ret = new Builder();
+
+        ret.lastOrderId = lastOrderId;
+        ret.allocated = allocatedBlocks;
+        ret.completed = completedBlocks;
+        ret.serverUnawareCompleted = serverUnawareComplated;
+        ret.tempBlocks = tempBlocks;
+
+        return ret;
     }
     
     public synchronized File getBlockFileIfExists(int blockId) {
@@ -199,11 +171,11 @@ public class BlockList {
         }
     }
 
-    public synchronized File getFileToSaveBlockTo(int blockId) {
+    public final File getFileToSaveBlockTo(int blockId) {
         return new File(downloadedBlockDir, Integer.toString(blockId));
     }
 
-    public synchronized File getFileToSaveTempBlockTo(int blockId) {
+    public final File getFileToSaveTempBlockTo(int blockId) {
         return new File(tempBlockDir, Integer.toString(blockId));
     }
 

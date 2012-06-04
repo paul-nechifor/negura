@@ -1,11 +1,9 @@
 package negura.common.util;
 
-import java.io.File;
 import negura.common.ex.NeguraError;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import java.io.BufferedReader;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -128,7 +126,7 @@ public class Util {
     }
 
     public static JsonObject readJsonFromFile(String path)
-            throws FileNotFoundException, IOException {
+            throws IOException {
         FileReader fis = new FileReader(path);
         BufferedReader in = new BufferedReader(fis);
         JsonParser parser = new JsonParser();

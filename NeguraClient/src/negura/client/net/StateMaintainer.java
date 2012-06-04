@@ -63,7 +63,7 @@ public class StateMaintainer extends Service implements BlockList.OutListener {
                 new Runnable() {
             @Override
             public void run() {
-                sendDownloadedBlocks();
+                sendCompletedBlocks();
             }
         });
 
@@ -130,24 +130,40 @@ public class StateMaintainer extends Service implements BlockList.OutListener {
             blocks.add(e.getAsInt());
         }
 
-        blockList.addModifications(blocks);
+        if (!blocks.isEmpty()) {
+            blockList.addModifications(blocks);
+        }
     }
 
-    private void sendDownloadedBlocks() {
+    @SuppressWarnings("unchecked")
+    private void sendCompletedBlocks() {
+        // Take the blocks out so that I don't hog the lock.
+        ArrayList<Integer> toSend;
         synchronized (completed) {
             if (completed.isEmpty())
                 return;
+            
+            // TODO: Maybe change this to eliminate clone.
+            toSend = (ArrayList<Integer>) completed.clone();
+            completed.clear();
+        }
 
-            JsonObject mesg = Comm.newMessage("have-blocks");
-            mesg.addProperty("uid", cm.getUserId());
-            mesg.add("blocks", Json.toJsonElement(completed));
+        JsonObject mesg = Comm.newMessage("have-blocks");
+        mesg.addProperty("uid", cm.getUserId());
+        mesg.add("blocks", Json.toJsonElement(toSend));
 
-            try {
-                Comm.readMessage(cm.getServerAddress(), mesg);
-                NeguraLog.info("Sent downloaded blocks: " + completed);
-                completed.clear();
-            } catch (IOException ex) {
-                NeguraLog.warning(ex, "Server error.");
+        try {
+            Comm.readMessage(cm.getServerAddress(), mesg);
+            NeguraLog.info("Sent completed blocks: " + toSend);
+
+            for (Integer blockId : toSend)
+                blockList.addToServerAwareCompleted(blockId);
+        } catch (IOException ex) {
+            NeguraLog.warning(ex, "Server error.");
+
+            // On failure add them back.
+            synchronized (completed) {
+                completed.addAll(toSend);
             }
         }
     }

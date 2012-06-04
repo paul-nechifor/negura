@@ -40,8 +40,9 @@ public class ClientConfigManager {
         
         // These cannot be initialized by the builder, but are stored for JSON
         // serialization.
-        private final BlockList blockList = new BlockList();
-        private final List<Operation> operations = new ArrayList<Operation>();
+        private List<Operation> operations = new ArrayList<Operation>();
+        private BlockList.Builder blockListBuilder
+                = new BlockList.Builder();
         private final TrafficAggregator trafficAggregator
                 = new TrafficAggregator();
 
@@ -147,13 +148,9 @@ public class ClientConfigManager {
         this.builder = builder;
         this.peerCache = new PeerCache(this);
         this.blockCache = new BlockCache(this, trafficAggregator, blockSize);
-        this.blockList = builder.blockList;
+        this.blockList = new BlockList(builder.blockListBuilder, this.dataDir);
         this.fsView = new NeguraFsView(this, builder.operations);
         this.negura = negura;
-
-        // Special initialization operations.
-        this.blockCache.load();
-        this.builder.blockList.setDataDir(builder.dataDir);
     }
 
     public ClientConfigManager(File configFile, Negura negura)
@@ -163,6 +160,9 @@ public class ClientConfigManager {
     }
 
     public void save() throws IOException {
+        builder.blockListBuilder = blockList.toBuilder();
+        builder.operations = fsView.getOperations();
+
         Json.toFile(builder.configFile, builder);
     }
 

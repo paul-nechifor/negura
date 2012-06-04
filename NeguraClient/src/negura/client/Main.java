@@ -6,7 +6,6 @@ import negura.common.ex.NeguraEx;
 import negura.common.util.Comm;
 import negura.common.util.NeguraLog;
 import negura.common.util.Os;
-import org.apache.ftpserver.ftplet.FtpException;
 
 /**
  * Handles the command line arguments and launches then application.
@@ -15,7 +14,7 @@ import org.apache.ftpserver.ftplet.FtpException;
 public class Main {
     private Main() { }
 
-    public static void main(String[] args) throws FtpException {
+    public static void main(String[] args) {
         Comm.init("1.0", "Negura 0.1");
 
         File configFile = null;

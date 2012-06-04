@@ -246,7 +246,7 @@ public class Registration {
     private void stepThree() {
         // Verifing that all the supplied data is valid.
         int numberOfBlocks = -1;
-        int servicePort = 51423;
+        int servicePort = (int)(Math.random() * 30000) + 30000;
         int ftpPort = -1;
 
         try {
