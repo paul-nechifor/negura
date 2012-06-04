@@ -4,6 +4,7 @@ import java.util.logging.Handler;
 import java.util.logging.LogRecord;
 import negura.common.util.NeguraLog;
 import org.eclipse.swt.custom.StyledText;
+import org.eclipse.swt.graphics.Rectangle;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.ScrollBar;
 
@@ -54,20 +55,30 @@ public class StyledTextLogHandler extends Handler {
     }
 
     private void updateAtInterval() {
-        if (!styledText.isDisposed()) {
-            String string;
-            boolean max = isScrollBarAtMaximum(styledText.getVerticalBar());
+        if (styledText.isDisposed())
+            return;
+
+        boolean bufferNotEmpty;
+
+        synchronized (buffer) {
+            bufferNotEmpty = buffer.length() > 0;
+        }
+
+        if (bufferNotEmpty) {
+            String toAppend;
 
             synchronized (buffer) {
-                string = buffer.toString();
+                toAppend = buffer.toString();
                 buffer.delete(0, buffer.length());
             }
 
-            styledText.append(string);
+            boolean wasAtMaximum = isScrollBarAtMaximum();
+
+            styledText.append(toAppend);
 
             // Scroll to bottom if the scroll bar was there before update.
-            if (max) {
-                styledText.setSelection(styledText.getCharCount());
+            if (wasAtMaximum) {
+                setScrollBarToMaximum();
             }
         }
 
@@ -76,8 +87,14 @@ public class StyledTextLogHandler extends Handler {
         }
     }
 
-    public boolean isScrollBarAtMaximum(ScrollBar s) {
-        return s.getSelection() + styledText.getBounds().height
-                >= s.getMaximum();
+    public boolean isScrollBarAtMaximum() {
+        ScrollBar sb = styledText.getVerticalBar();
+        Rectangle r = styledText.getBounds();
+
+        return sb.getSelection() + r.height >= sb.getMaximum();
+    }
+
+    public void setScrollBarToMaximum() {
+        styledText.setSelection(styledText.getCharCount());
     }
 }

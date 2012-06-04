@@ -7,6 +7,7 @@ import negura.common.data.ThreadPoolOptions;
 import negura.common.gui.KeyGenerationWindow;
 import negura.common.gui.Swt;
 import negura.common.util.MsgBox;
+import negura.common.util.NeguraLog;
 import negura.common.util.Util;
 import negura.server.ServerConfigManager;
 import negura.server.ServerConfigManager.Builder;
@@ -285,7 +286,7 @@ public class ConfigMaker {
         builder.serverKeyPair = keyPair[0];
         builder.adminKeyPair = keyPair[1];
 
-        File parent = builder.configFile.getParentFile();
+        File parent = builder.configFile.getAbsoluteFile().getParentFile();
         if (!parent.exists() && parent.mkdirs()) {
             shell.setVisible(false);
             MsgBox.error(shell, "Failed to create directory: " +
@@ -294,7 +295,7 @@ public class ConfigMaker {
             return;
         }
 
-        ServerConfigManager cm = new ServerConfigManager(builder);
+        ServerConfigManager cm = new ServerConfigManager(builder, null);
         try {
             cm.save();
         } catch (IOException ex) {

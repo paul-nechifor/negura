@@ -24,15 +24,15 @@ public class MainWindow extends Window {
         this.display = (Display) getDevice();
 
         shell.setText("Negura Server");
-
         shell.setLayout(Swt.singletonLayout(5, 5));
 
-        String[] tabNames = {"Output", "Blocks", "Files", "Settings"};
-
+        String[] tabNames = {"Output", "Blocks", "Operations", "Settings"};
         TabFolder tabFolder = Swt.newTabForder(shell, null, tabNames);
 
+
         new OutputTab(tabFolder.getItem(0));
-        new BlocksTab(tabFolder.getItem(1));
+        new BlocksTab(tabFolder.getItem(1), cm);
+        new OperationsTab(tabFolder.getItem(2), cm);
         
         shell.setSize(797, 599);
 

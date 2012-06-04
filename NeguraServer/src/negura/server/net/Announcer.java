@@ -14,6 +14,7 @@ import negura.common.util.Comm;
 import negura.common.util.NeguraLog;
 import negura.common.util.Util;
 import negura.server.DataManager;
+import negura.server.ServerConfigManager;
 
 /**
  * Announces the uses of the blocks they must download and of the filesystem
@@ -39,9 +40,8 @@ public class Announcer extends Service {
     private HashSet<Integer> allocatedUsers = new HashSet<Integer>();
     private ScheduledExecutorService scheduler;
 
-    public Announcer(DataManager dataManager) {
-        this.dataManager = dataManager;
-
+    public Announcer(ServerConfigManager cm) {
+        this.dataManager = cm.getNeguraServer().getDataManager();
     }
 
     @Override

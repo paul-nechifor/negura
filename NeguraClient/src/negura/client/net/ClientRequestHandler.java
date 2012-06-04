@@ -28,9 +28,9 @@ public class ClientRequestHandler implements RequestHandler {
     private final Negura negura;
     private final TrafficAggregator trafficAggregator;
 
-    public ClientRequestHandler(Negura negura, ClientConfigManager cm) {
-        this.negura = negura;
+    public ClientRequestHandler(ClientConfigManager cm) {
         this.cm = cm;
+        this.negura = cm.getNegura();
         this.trafficAggregator = cm.getTrafficAggregator();
     }
 

@@ -72,7 +72,7 @@ public class NeguraFtpFile implements FtpFile {
     }
 
     public long getLastModified() {
-        return file.date * 1000;
+        return file.date;
     }
 
     public boolean setLastModified(long l) {

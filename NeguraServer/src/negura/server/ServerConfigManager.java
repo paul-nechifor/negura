@@ -18,7 +18,7 @@ public class ServerConfigManager {
     public static class Builder {
         public transient File configFile;
 
-        public ServerInfo serverInfo;
+        public ServerInfo serverInfo = new ServerInfo();
         public int virtualDiskBlocks;
         public int port;
         public ThreadPoolOptions threadPoolOptions;
@@ -30,18 +30,26 @@ public class ServerConfigManager {
         public boolean firstRun;
 
         public Builder(File configFile) {
+            if (configFile == null) {
+                throw new IllegalArgumentException("The file can't be null");
+            }
+
             this.configFile = configFile;
-            this.serverInfo = new ServerInfo();
         }
     }
 
     private final Builder builder;
+    private final NeguraServer neguraServer;
 
-    public ServerConfigManager(Builder builder) {
+    public ServerConfigManager(Builder builder, NeguraServer neguraServer) {
         this.builder = builder;
+        this.neguraServer = neguraServer;
     }
 
-    public ServerConfigManager(File configFile) throws NeguraEx {
+    public ServerConfigManager(File configFile, NeguraServer neguraServer)
+            throws NeguraEx {
+        this.neguraServer = neguraServer;
+
         try {
             this.builder = Json.fromFile(configFile, Builder.class);
         } catch (JsonSyntaxException ex) {
@@ -57,6 +65,10 @@ public class ServerConfigManager {
         Json.toFile(builder.configFile, builder);
     }
 
+    public final NeguraServer getNeguraServer() {
+        return neguraServer;
+    }
+
     public String getDatabaseUrl() {
         return builder.databaseUrl;
     }
@@ -67,6 +79,10 @@ public class ServerConfigManager {
 
     public String getDatabasePassword() {
         return builder.databasePassword;
+    }
+
+    public RsaKeyPair getServerKeyPair() {
+        return builder.serverKeyPair;
     }
 
     public int getPort() {
@@ -81,11 +97,11 @@ public class ServerConfigManager {
         return builder.threadPoolOptions;
     }
 
-    public boolean getFirstRun() {
+    public synchronized boolean getFirstRun() {
         return builder.firstRun;
     }
 
-    public void setFirstRunOff() {
+    public synchronized void setFirstRunOff() {
         builder.firstRun = false;
     }
 

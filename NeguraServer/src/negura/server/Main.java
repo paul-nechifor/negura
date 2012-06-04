@@ -1,7 +1,9 @@
 package negura.server;
 
 import java.io.File;
+import negura.common.ex.NeguraEx;
 import negura.common.util.Comm;
+import negura.common.util.NeguraLog;
 import negura.common.util.Os;
 import negura.server.gui.ConfigMaker;
 import org.apache.commons.cli.CommandLine;
@@ -79,7 +81,11 @@ public class Main {
             System.exit(0);
         }
 
-        NeguraServer server = new NeguraServer(configFile, useCli);
-        server.run();
+        try {
+            NeguraServer server = new NeguraServer(configFile, useCli);
+            server.run();
+        } catch (NeguraEx ex) {
+            NeguraLog.warning(ex.getMessage());
+        }
     }
 }

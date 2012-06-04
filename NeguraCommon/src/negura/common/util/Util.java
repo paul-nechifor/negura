@@ -1,5 +1,6 @@
 package negura.common.util;
 
+import java.io.File;
 import negura.common.ex.NeguraError;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;

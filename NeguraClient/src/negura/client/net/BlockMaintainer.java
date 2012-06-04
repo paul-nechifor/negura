@@ -36,9 +36,9 @@ public class BlockMaintainer extends Service implements BlockList.InListener {
     private final Object schedulerLock = new Object();
     private ScheduledExecutorService scheduler = null;
 
-    public BlockMaintainer(ClientConfigManager cm, StateMaintainer sm) {
+    public BlockMaintainer(ClientConfigManager cm) {
         this.cm = cm;
-        this.sm = sm;
+        this.sm = cm.getNegura().getStateMaintainer();
         this.blockList = cm.getBlockList();
         this.trafficAggregator = cm.getTrafficAggregator();
         this.buffer = new byte[cm.getBlockSize()];

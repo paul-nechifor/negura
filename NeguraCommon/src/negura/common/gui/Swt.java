@@ -30,6 +30,8 @@ import org.eclipse.swt.widgets.Scale;
 import org.eclipse.swt.widgets.Shell;
 import org.eclipse.swt.widgets.TabFolder;
 import org.eclipse.swt.widgets.TabItem;
+import org.eclipse.swt.widgets.Table;
+import org.eclipse.swt.widgets.TableColumn;
 import org.eclipse.swt.widgets.Text;
 import org.eclipse.swt.widgets.Widget;
 
@@ -221,6 +223,20 @@ public class Swt {
                 TabItem item = new TabItem(ret, SWT.NONE);
                 item.setText(tabName);
             }
+        }
+
+        return ret;
+    }
+
+    public static Table newTable(Composite c, String layout,
+            String[] columnNames) {
+        Table ret = n(Table.class, c, SWT.FULL_SELECTION | SWT.BORDER, layout);
+        ret.setLinesVisible (true);
+        ret.setHeaderVisible (true);
+
+        for (String columnName : columnNames) {
+            TableColumn column = new TableColumn(ret, SWT.NONE);
+            column.setText(columnName);
         }
 
         return ret;

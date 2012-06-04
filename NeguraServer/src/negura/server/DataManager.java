@@ -17,6 +17,7 @@ import java.util.Map.Entry;
 import negura.common.ex.NeguraEx;
 import negura.common.util.Util;
 import negura.common.data.Block;
+import negura.common.data.BlockInfo;
 import negura.common.data.Operation;
 import negura.common.ex.NeguraError;
 import negura.common.util.NeguraLog;
@@ -771,6 +772,62 @@ public class DataManager {
     }
 
     /**
+     * Returns blocks statistics.
+     * @return                  A list of blocks with statistics about them.
+     * @throws SQLException
+     */
+    public List<BlockInfo> getBlockStatistics() throws SQLException {
+        Connection c = null;
+        Statement s = null;
+
+        try {
+            c = connectionPool.getConnection();
+            s = c.createStatement();
+            ResultSet results = s.executeQuery(
+                "SELECT bout.bid, s1.acount, s2.ccount, coalesce(s3.oid, -1) " +
+                "FROM blocks bout " +
+                "INNER JOIN ( " +
+                    "SELECT b.bid, count(a.bid) as acount " +
+                    "FROM blocks b " +
+                    "LEFT OUTER JOIN allocated a ON a.bid = b.bid " +
+                    "GROUP BY b.bid " +
+                ") s1 ON s1.bid = bout.bid " +
+                "INNER JOIN ( " +
+                    "SELECT b.bid, count(a.bid) as ccount " +
+                    "FROM blocks b " +
+                    "LEFT OUTER JOIN completed a ON a.bid = b.bid " +
+                    "GROUP BY b.bid " +
+                ") s2 ON s2.bid = bout.bid " +
+                "LEFT OUTER JOIN ( " +
+                    "SELECT o.oid, b.bid " +
+                    "FROM blocks b, operations o " +
+                    "WHERE b.bid BETWEEN o.firstbid AND o.lastbid " +
+                ") s3 ON s3.bid = bout.bid " +
+                "ORDER BY bout.bid"
+            );
+
+            List<BlockInfo> ret = new ArrayList<BlockInfo>();
+
+            BlockInfo b;
+            while (results.next()) {
+                b = new BlockInfo();
+                b.bid = results.getInt(1);
+                b.allocated = results.getInt(2);
+                b.completed = results.getInt(3);
+                b.oid = results.getInt(4);
+                ret.add(b);
+            }
+
+            results.close();
+
+            return ret;
+        } finally {
+            closeQuietly(s);
+            closeQuietly(c);
+        }
+    }
+
+    /**
      * Close a connection without causing a fatal error.
      * @param c     The connection to be closed. Can be null.
      */
@@ -971,8 +1028,10 @@ public class DataManager {
 
         PreparedStatement ps = null;
         try {
-            ps = c.prepareStatement("UPDATE settings SET value = ? " +
-                    "WHERE key = ?");
+            ps = c.prepareStatement(
+                "UPDATE settings " +
+                "SET value = ? " +
+                "WHERE key = ?");
             for (int i = 0; i < keyvalues.length; i += 2) {
                 ps.setString(1, keyvalues[i + 1]); // value
                 ps.setString(2, keyvalues[i]);     // key

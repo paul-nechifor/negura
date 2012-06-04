@@ -33,9 +33,6 @@ public class NeguraFile {
     public long size;
     public HashMap<String, NeguraFile> subfiles;
 
-    /**
-     * Static factory constructor for a directory type.
-     */
     public static NeguraFile newDir(NeguraFsView fsView, String location,
             String name, int date) {
         NeguraFile ret = new NeguraFile();
@@ -44,15 +41,12 @@ public class NeguraFile {
         ret.location = location;
         ret.name = name;
         ret.type = DIR;
-        ret.date = date;
+        ret.date = (long)date * 1000;
         ret.size = 4096;
         ret.subfiles = new HashMap<String, NeguraFile>();
         return ret;
     }
 
-    /**
-     * Static factory constructor for a file type.
-     */
     public static NeguraFile newFile(NeguraFsView fsView, String location,
             String name, int date, long size, int operationId) {
         NeguraFile ret = new NeguraFile();
@@ -61,7 +55,7 @@ public class NeguraFile {
         ret.location = location;
         ret.name = name;
         ret.type = FILE;
-        ret.date = date;
+        ret.date = (long)date * 1000;
         ret.size = size;
         ret.subfiles = null;
         return ret;

@@ -10,6 +10,6 @@ public class Operation {
     public String hash;      // Might be null.
     public String type;
     public Block[] blocks;   // Might be null.
-    public int firstbid;
-    public int lastbid;
+    public int firstbid;     // Might be null, that is, -1.
+    public int lastbid;      // Might be null, that is, -1.
 }

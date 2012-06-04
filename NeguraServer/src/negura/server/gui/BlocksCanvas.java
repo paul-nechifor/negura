@@ -1,6 +1,7 @@
 package negura.server.gui;
 
 import java.util.List;
+import negura.common.data.BlockInfo;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.DisposeEvent;
 import org.eclipse.swt.events.DisposeListener;
@@ -16,7 +17,8 @@ import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Display;
 
 /**
- *
+ * A widget for visualizing blocks and their relative allocation and
+ * allocation completeness.
  * @author Paul Nechifor
  */
 public class BlocksCanvas extends Canvas {
@@ -25,19 +27,6 @@ public class BlocksCanvas extends Canvas {
 
     public static enum Type {
         ALLOCATED, COMPLETED
-    }
-    public static class BlockInfo {
-        public int bid;
-        public int allocated;
-        public int completed;
-        public int opid;
-
-        public BlockInfo(int bid, int allocated, int completed, int opid) {
-            this.bid = bid;
-            this.allocated = allocated;
-            this.completed = completed;
-            this.opid = opid;
-        }
     }
 
     private final BlocksTab blocksTab;
@@ -108,7 +97,7 @@ public class BlocksCanvas extends Canvas {
         if (diffAllocated == 0)
             diffAllocated = 1; // So that division by 0 doesn't happen.
 
-        int diffCompleted = maxAllocated - minAllocated;
+        int diffCompleted = maxCompleted - minCompleted;
         if (diffCompleted == 0)
             diffCompleted = 1; // So that division by 0 doesn't happen.
 
@@ -158,8 +147,14 @@ public class BlocksCanvas extends Canvas {
     private Color[] generateColors() {
         Color[] ret = new Color[COLORS];
 
+        double startColor = 200.0;
+        double endColor = 50.0;
+        double inc = (startColor - endColor) / (COLORS - 1);
+        int color;
+
         for (int i = 0; i < COLORS; i++) {
-            ret[i] = new Color(display, 40+i*10, 40+i*10, 40+i*10);
+            color = (int)(startColor - i * inc);
+            ret[i] = new Color(display, color, color, color);
         }
 
         return ret;

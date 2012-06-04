@@ -46,6 +46,10 @@ public class ClientConfigManager {
                 = new TrafficAggregator();
 
         public Builder(File configFile) {
+            if (configFile == null) {
+                throw new IllegalArgumentException("The file can't be null");
+            }
+            
             this.configFile = configFile;
         }
 

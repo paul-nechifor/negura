@@ -19,11 +19,13 @@ public class NeguraLog {
     private static final Logger LOGGER = Logger.getLogger("Negura");
     private static boolean IS_CONSOLE_HANDLER_SET = false;
     private static final ConsoleHandler CONSOLE_HANDLER = new ConsoleHandler();
+
     public static final Formatter FORMATTER = new Formatter() {
+        private final SimpleDateFormat f = new SimpleDateFormat("HH:mm:ss");
+
         @Override
         public String format(LogRecord record) {
-            String time = new SimpleDateFormat("HH:mm:ss")
-                    .format(new Date(record.getMillis()));
+            String time = f.format(new Date(record.getMillis()));
 
             StringBuilder builder = new StringBuilder();
             builder.append(time).append(' ').append(record.getLevel());

@@ -2,7 +2,9 @@ package negura.client;
 
 import java.io.File;
 import negura.client.gui.Registration;
+import negura.common.ex.NeguraEx;
 import negura.common.util.Comm;
+import negura.common.util.NeguraLog;
 import negura.common.util.Os;
 import org.apache.ftpserver.ftplet.FtpException;
 
@@ -40,7 +42,11 @@ public class Main {
             }
         }
 
-        Negura negura = new Negura(configFile);
-        negura.start();
+        try {
+            Negura negura = new Negura(configFile);
+            negura.start();
+        } catch (NeguraEx ex) {
+            NeguraLog.warning(ex.getMessage());
+        }
     }
 }

@@ -26,11 +26,10 @@ public class ServerRequestHandler implements RequestHandler {
     private DataManager dataManager;
     private Announcer announcer;
 
-    public ServerRequestHandler(ServerConfigManager cm, DataManager dataManager,
-            Announcer announcer) {
+    public ServerRequestHandler(ServerConfigManager cm) {
         this.cm = cm;
-        this.dataManager = dataManager;
-        this.announcer = announcer;
+        this.dataManager = cm.getNeguraServer().getDataManager();
+        this.announcer = cm.getNeguraServer().getAnnouncer();
     }
 
     public void handle(Socket socket) {

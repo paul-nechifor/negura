@@ -197,43 +197,12 @@ public class KeyGenerationWindow extends Window {
 
         // If it isn't in stored form, I have to ask for the password.
         if (!rsaKeyPair.isPrivateKeyDecrypted()) {
-            if (!tryToDecrypt(rsaKeyPair, shell, 5))
+            String message = "Enter password to decrypt key pair.";
+            if (!KeyPairUnlocker.tryToDecrypt(rsaKeyPair, shell, 5, message))
                 return null;
         }
 
         // The password was correct so set the key pair and path.
         return new Object[] {selectedFile, rsaKeyPair};
-    }
-
-    public static boolean tryToDecrypt(RsaKeyPair rsaKeyPair, Shell shell,
-            int tries) {
-        String message = "Enter password to decrypt key pair.";
-        Boolean remember = false;
-        for (int i = 0; i < tries; i++) {
-            PasswordWindow pw = new PasswordWindow(shell, false, remember,
-                    message);
-            String password = pw.open();
-            remember = pw.getRemember();
-
-            // User canceled so return not succeded.
-            if (password == null)
-                return false;
-
-            if (rsaKeyPair.decryptPrivateKey(password)) {
-                // Password is correct.
-                // Unlock the private key if the user wants.
-                if (remember != null && remember) {
-                    rsaKeyPair.transformToStored(password,
-                            rsaKeyPair.getRepetitions() / 4);
-                }
-                // The password was correct.
-                return true;
-            } else {
-                // The password was incorrect so try another time.
-                message = "Password was incorrect. Try again or exit.";
-            }
-        }
-
-        return false;
     }
 }

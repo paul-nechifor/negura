@@ -49,12 +49,6 @@ public class TrayGui extends Service {
     protected void onStart() {
         started();
 
-        display.syncExec(new Runnable() {
-            public void run() {
-                decryptPrivateKey();
-            }
-        });
-
         while (!shell.isDisposed() && serviceState == RUNNING) {
             if (!display.readAndDispatch()) {
                 display.sleep();
@@ -181,19 +175,5 @@ public class TrayGui extends Service {
         tip.setAutoHide(true);
         trayItem.setToolTip(tip);
         tip.setVisible(true);
-    }
-
-    private void decryptPrivateKey() {
-        RsaKeyPair keyPair = cm.getKeyPair();
-        if (keyPair.isPrivateKeyDecrypted())
-            return;
-
-        boolean success = KeyGenerationWindow.tryToDecrypt(keyPair, shell, 3);
-
-        if (!success) {
-            MsgBox.error(shell, "The passwords were incorrect. "
-                    + "The program will close.");
-            negura.shutdown();
-        }
     }
 }

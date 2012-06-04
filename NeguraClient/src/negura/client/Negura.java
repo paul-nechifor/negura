@@ -32,7 +32,10 @@ import negura.client.net.StateMaintainer;
 import negura.common.data.Block;
 import negura.common.data.BlockList;
 import negura.common.data.Operation;
+import negura.common.data.RsaKeyPair;
 import negura.common.data.TrafficLogger;
+import negura.common.ex.NeguraEx;
+import negura.common.gui.KeyPairUnlocker;
 import negura.common.json.Json;
 import negura.common.util.Comm;
 import negura.common.net.RequestServer;
@@ -52,7 +55,7 @@ public class Negura {
     // This is special. It has to be started in it's own thread.
     private TrayGui trayGui;
 
-    public Negura(File configFile) {
+    public Negura(File configFile) throws NeguraEx {
         // Loading the configuration manager.
         ClientConfigManager manager = null;
         try {
@@ -60,15 +63,29 @@ public class Negura {
         } catch (IOException ex) {
             NeguraLog.severe(ex);
         }
-        cm = manager;
 
+        // If the private key is locked, build a GUI and prompt the user for
+        // the password and quit on failure.
+        RsaKeyPair rsaKeyPair = manager.getKeyPair();
+        if (!rsaKeyPair.isPrivateKeyDecrypted()) {
+            KeyPairUnlocker unlocker = new KeyPairUnlocker(rsaKeyPair, 5,
+                    "Enter password to decrypt key pair.", 
+                    "The passwords were incorrect. The application will now " +
+                    "close.");
+            
+            if (!unlocker.openAndTryToUnlock()) {
+                throw new NeguraEx("Failed to unlock private key.");
+            }
+        }
+
+        cm = manager;
         trafficLogger = new TrafficLogger(cm.getTrafficAggregator(), 0.5, 120);
-        ClientRequestHandler handler = new ClientRequestHandler(this, cm);
+        ClientRequestHandler handler = new ClientRequestHandler(cm);
         requestServer = new RequestServer(cm.getServicePort(),
                 cm.getThreadPoolOptions(), handler);
         ftpServer = new NeguraFtpServer(cm);
         stateMaintainer = new StateMaintainer(cm);
-        blockMaintainer = new BlockMaintainer(cm, stateMaintainer);
+        blockMaintainer = new BlockMaintainer(cm);
         cm.getBlockList().setOutListener(stateMaintainer);
         cm.getBlockList().setInListener(blockMaintainer);
     }
