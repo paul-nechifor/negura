@@ -12,14 +12,14 @@ import org.eclipse.swt.widgets.TabFolder;
  * @author Paul Nechifor
  */
 public class MainWindow extends Window {
-    private final ServerConfigManager cm;
     private final Display display;
+    private final TabFolder tabFolder;
+    private final OperationsTab operationsTab;
     private final Runnable runAfter;
 
     public MainWindow(ServerConfigManager cm, Runnable runAfter) {
         super(new Shell(new Display()));
 
-        this.cm = cm;
         this.runAfter = runAfter;
         this.display = (Display) getDevice();
 
@@ -27,17 +27,22 @@ public class MainWindow extends Window {
         shell.setLayout(Swt.singletonLayout(5, 5));
 
         String[] tabNames = {"Output", "Blocks", "Operations", "Settings"};
-        TabFolder tabFolder = Swt.newTabForder(shell, null, tabNames);
+        tabFolder = Swt.newTabForder(shell, null, tabNames);
 
 
         new OutputTab(tabFolder.getItem(0));
-        new BlocksTab(tabFolder.getItem(1), cm);
-        new OperationsTab(tabFolder.getItem(2), cm);
+        new BlocksTab(tabFolder.getItem(1), cm, this);
+        operationsTab = new OperationsTab(tabFolder.getItem(2), cm);
         
         shell.setSize(797, 599);
 
         Swt.centerShell(shell);
         shell.open();
+    }
+
+    public void blockOfOperationActivated(int operationId) {
+        tabFolder.setSelection(2);
+        operationsTab.selectOperation(operationId);
     }
 
     public final void loopUntilClosed() {

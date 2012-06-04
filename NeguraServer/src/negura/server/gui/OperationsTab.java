@@ -5,6 +5,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import negura.common.data.Operation;
+import negura.common.ex.NeguraRunEx;
 import negura.common.gui.Swt;
 import negura.common.util.NeguraLog;
 import negura.common.util.Util;
@@ -79,6 +80,19 @@ public class OperationsTab {
         }
 
         packTable();
+    }
+
+    public void selectOperation(int operationId) {
+        if (operationId > table.getItemCount()) {
+            load();
+        }
+
+        if (operationId > table.getItemCount()) {
+            throw new NeguraRunEx("There aren't that many operations.");
+        }
+
+        table.setFocus();
+        table.setSelection(operationId - 1);
     }
 
     private void packTable() {

@@ -2,9 +2,11 @@ package negura.server.gui;
 
 import java.util.List;
 import negura.common.data.BlockInfo;
+import negura.common.util.NeguraLog;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.events.DisposeEvent;
 import org.eclipse.swt.events.DisposeListener;
+import org.eclipse.swt.events.MouseAdapter;
 import org.eclipse.swt.events.MouseEvent;
 import org.eclipse.swt.events.MouseMoveListener;
 import org.eclipse.swt.events.PaintEvent;
@@ -30,6 +32,7 @@ public class BlocksCanvas extends Canvas {
     }
 
     private final BlocksTab blocksTab;
+    private final MainWindow mainWindow;
     private final Display display;
     private final Color[] colors;
 
@@ -48,10 +51,12 @@ public class BlocksCanvas extends Canvas {
     private int vertBlocks;
     private int blocksPerPage;
 
-    public BlocksCanvas(Composite parent, BlocksTab blocksTab) {
+    public BlocksCanvas(Composite parent, BlocksTab blocksTab,
+            MainWindow mainWindow) {
         super(parent, SWT.NONE);
 
         this.blocksTab = blocksTab;
+        this.mainWindow = mainWindow;
         this.display = parent.getDisplay();
         this.colors = generateColors();
 
@@ -69,6 +74,12 @@ public class BlocksCanvas extends Canvas {
         addMouseMoveListener(new MouseMoveListener() {
             public void mouseMove(MouseEvent e) {
                 BlocksCanvas.this.mouseMove(e);
+            }
+        });
+        addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseDoubleClick(MouseEvent me) {
+                BlocksCanvas.this.mouseDoubleClick(me);
             }
         });
     }
@@ -226,18 +237,34 @@ public class BlocksCanvas extends Canvas {
         }
     }
 
+    private int activeIndex(int x, int y) {
+        int row = (y - 2) / BLOCKSIZE;
+        int col = (x - 2) / BLOCKSIZE;
+        return currentPage * blocksPerPage + row * horizBlocks + col;
+    }
+
     private synchronized void mouseMove(MouseEvent e) {
         if (blocks == null)
             return;
 
-        int row = (e.y - 2) / BLOCKSIZE;
-        int col = (e.x - 2) / BLOCKSIZE;
-        int index = currentPage * blocksPerPage + row * horizBlocks + col;
-
+        int index = activeIndex(e.x, e.y);
         if (index >= blocks.size()) {
             blocksTab.blockActive(null);
         } else {
             blocksTab.blockActive(blocks.get(index));
+        }
+    }
+
+    private synchronized void mouseDoubleClick(MouseEvent e) {
+        if (blocks == null)
+            return;
+
+        int index = activeIndex(e.x, e.y);
+        if (index < blocks.size()) {
+            int oid = blocks.get(index).oid;
+            if (oid != -1) {
+                mainWindow.blockOfOperationActivated(oid);
+            }
         }
     }
 }

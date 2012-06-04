@@ -29,7 +29,8 @@ public class BlocksTab {
     private final Label pageL;
     private Type type = Type.ALLOCATED;
 
-    public BlocksTab(TabItem tabItem, ServerConfigManager cm) {
+    public BlocksTab(TabItem tabItem, ServerConfigManager cm,
+            MainWindow mainWindow) {
         dataManager = cm.getNeguraServer().getDataManager();
 
         Composite composite = new Composite(tabItem.getParent(), SWT.NONE);
@@ -40,7 +41,7 @@ public class BlocksTab {
 
         infoL = Swt.newLabel(composite, "span, w max, wrap", null);
 
-        blocksCanvas = new BlocksCanvas(composite, this);
+        blocksCanvas = new BlocksCanvas(composite, this, mainWindow);
         blocksCanvas.setLayoutData("span, w max, h max, wrap");
         
         loadB = Swt.newButton(composite, null, "Load");
