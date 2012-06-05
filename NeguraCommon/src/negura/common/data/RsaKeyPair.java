@@ -183,7 +183,7 @@ public class RsaKeyPair {
         byte[] bytes = privateKey.getEncoded();
 
         try {
-            byte[] encrypted = Aes.encrypt(bytes, hexPass);
+            byte[] encrypted = Aes.encrypt(bytes, trunc(hexPass));
             return DatatypeConverter.printBase64Binary(encrypted);
         } catch (GeneralSecurityException ex) {
             NeguraLog.severe(ex);
@@ -203,10 +203,14 @@ public class RsaKeyPair {
         byte[] bytes = DatatypeConverter.parseBase64Binary(keyBase64);
 
         try {
-            byte[] decrypted = Aes.decrypt(bytes, hexPass);
+            byte[] decrypted = Aes.decrypt(bytes, trunc(hexPass));
             return Rsa.privateKeyFromBytes(decrypted);
         } catch (GeneralSecurityException ex) {
             return null;
         }
+    }
+
+    private static String trunc(String hexKey) {
+        return hexKey.substring(0, 32); // 128-bit so that works everyware.
     }
 }

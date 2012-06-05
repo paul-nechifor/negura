@@ -195,6 +195,7 @@ public class DataManager {
      * @return                  The user ID.
      * @throws SQLException 
      */
+    // TODO: Maybe this whole operation should be a single transaction.
     public int createNewUser(String ipAddress, int port, int numberOfBlocks,
             String publicKey) throws SQLException {
         Connection c = null;
@@ -234,6 +235,37 @@ public class DataManager {
             );
             ps.setInt(1, userId);
             ps.setInt(2, numberOfBlocks);
+            ps.executeUpdate();
+
+            // Getting all the blocks which were allocated and are used.
+            int firstFreeBlock = Integer.parseInt(getValue(c,
+                    "first_free_block"));
+
+            ps = c.prepareStatement(
+                "INSERT INTO alist " +
+                    "SELECT ?, bid, row_number() OVER (ORDER BY uid) " +
+                    "FROM allocated " +
+                    "WHERE uid = ? AND bid < ?"
+            );
+            ps.setInt(1, userId);
+            ps.setInt(2, userId);
+            ps.setInt(3, firstFreeBlock);
+            ps.executeUpdate();
+
+            int countIndex = (int)(long)(Long)singleValueResult(c,
+                    "SELECT count(bid) " +
+                    "FROM allocated " +
+                    "WHERE uid = " + userId + " " +
+                    "AND bid < " + firstFreeBlock
+            );
+
+            ps = c.prepareStatement(
+                    "UPDATE users " +
+                    "SET newindex = ? " +
+                    "WHERE uid = ?"
+            );
+            ps.setInt(1, countIndex + 1);
+            ps.setInt(2, userId);
             ps.executeUpdate();
 
             return userId;

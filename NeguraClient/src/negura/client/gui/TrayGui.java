@@ -147,6 +147,11 @@ public class TrayGui extends Service {
                 File dataDir = cm.getDataDir();
                 negura.shutdown();
                 Os.removeDirectory(dataDir);
+
+//                Os.removeDirectory(Os.getUserConfigDir(
+//                        I18n.get("applicationShortName")));
+//                Os.removeDirectory(Os.getUserDataDir(
+//                        I18n.get("applicationShortName")));
             }
         });
     }

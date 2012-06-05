@@ -10,18 +10,18 @@
  * TODO: Put a handler for the exceptions in different threads.
  *
  * TODO: User joins in DataManager.
+ *
+ * TODO: Why are the blocks added to completed but not send imediatly?
+ *
+ * TODO: Blocks aren't given if you registered after the files were added.
  */
 
 package negura.client;
 
 import com.google.gson.JsonElement;
-import java.security.NoSuchAlgorithmException;
 import negura.client.net.ClientRequestHandler;
-import negura.client.fs.NeguraFile;
-import negura.client.fs.NeguraFileInputStream;
 import com.google.gson.JsonObject;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,7 +40,6 @@ import negura.common.util.Comm;
 import negura.common.net.RequestServer;
 import negura.common.util.NeguraLog;
 import negura.common.util.NeguraLog.SevereHandler;
-import negura.common.util.Util;
 
 public class Negura {
     private final ClientConfigManager cm;
