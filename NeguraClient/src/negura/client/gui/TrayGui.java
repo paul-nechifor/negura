@@ -1,5 +1,6 @@
 package negura.client.gui;
 
+import java.io.File;
 import negura.client.ClientConfigManager;
 import negura.client.I18n;
 import negura.client.Negura;
@@ -143,11 +144,9 @@ public class TrayGui extends Service {
         });
         selfDestructMi.addListener(SWT.Selection, new Listener() {
             public void handleEvent(Event event) {
+                File dataDir = cm.getDataDir();
                 negura.shutdown();
-                Os.removeDirectory(Os.getUserConfigDir(
-                        I18n.get("applicationShortName")));
-                Os.removeDirectory(Os.getUserDataDir(
-                        I18n.get("applicationShortName")));
+                Os.removeDirectory(dataDir);
             }
         });
     }

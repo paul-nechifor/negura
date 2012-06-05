@@ -17,8 +17,9 @@ import java.util.logging.Logger;
  */
 public class NeguraLog {
     private static final Logger LOGGER = Logger.getLogger("Negura");
-    private static boolean IS_CONSOLE_HANDLER_SET = false;
     private static final ConsoleHandler CONSOLE_HANDLER = new ConsoleHandler();
+    private static boolean IS_CONSOLE_HANDLER_SET = false;
+    private static SevereHandler severeHandler;
 
     public static final Formatter FORMATTER = new Formatter() {
         private final SimpleDateFormat f = new SimpleDateFormat("HH:mm:ss");
@@ -43,6 +44,10 @@ public class NeguraLog {
         }
     };
 
+    public interface SevereHandler {
+        void terminateFor(String message, Throwable throwable);
+    }
+
     private NeguraLog() { }
 
     static {
@@ -64,6 +69,10 @@ public class NeguraLog {
 
     public static void removeHandler(Handler handler) {
         LOGGER.removeHandler(handler);
+    }
+
+    public static void setSevereHandler(SevereHandler severeHandler) {
+        NeguraLog.severeHandler = severeHandler;
     }
 
     /**
@@ -91,6 +100,10 @@ public class NeguraLog {
 
         if (level == Level.SEVERE) {
             flushAll();
+
+            if (severeHandler != null)
+                severeHandler.terminateFor(message, throwable);
+
             System.exit(1);
         }
     }

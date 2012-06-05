@@ -1,4 +1,4 @@
-package negura.common.util;
+package negura.common.gui;
 
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.widgets.MessageBox;

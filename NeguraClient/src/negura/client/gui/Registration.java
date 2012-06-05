@@ -17,7 +17,7 @@ import negura.common.gui.KeyGenerationWindow;
 import negura.common.gui.Swt;
 import negura.common.json.Json;
 import negura.common.util.Comm;
-import negura.common.util.MsgBox;
+import negura.common.gui.MsgBox;
 import negura.common.util.NeguraLog;
 import negura.common.util.Os;
 import negura.common.util.Rsa;
@@ -50,6 +50,7 @@ public class Registration {
     private final Composite p1;
     private final Composite p2;
     private final Text addressT;
+    private final Text testingCodeT;
     private final Label serverNameValL;
     private final Label blockSizeValL;
     private final Label minBlocksValL;
@@ -57,13 +58,15 @@ public class Registration {
     private final Scale blocksToStoreS;
     private final Label spaceToBeUsedValL;
     private final Text ftpPortT;
+    private final Text servicePortT;
+    private final Text keyPairT;
     private final Button doneB;
     private InetSocketAddress serverAddress;
     private ServerInfo serverInfo;
-    private int minBlocks;
     private KeyGenerationWindow keyGenerationWindow = null;
     private RsaKeyPair rsaKeyPair;
     private boolean registeredSuccessfully = false;
+    private File configFile;
 
     public Registration() {
         display = new Display();
@@ -86,7 +89,10 @@ public class Registration {
                 I18n.get("newConnection"));
 
         Swt.newLabel(p1, "wrap", I18n.get("serverAddress"));
-        addressT = Swt.newText(p1, "wrap push, w 200!", "127.0.0.1:5000");
+        addressT = Swt.newText(p1, "w 200!, wrap 50", "127.0.0.1:5000");
+
+        Swt.newLabel(p1, "wrap", "Testing code:");
+        testingCodeT = Swt.newText(p1, "wrap push, w 200!", genTestingCode());
 
         Button continueB = Swt.newButton(p1, "skip 1",
                 I18n.get("continue"));
@@ -96,6 +102,7 @@ public class Registration {
                 newConnectionL.getFont(), 16);
         Swt.connectDisposal(shell, titleFont);
         newConnectionL.setFont(titleFont);
+        testingCodeT.addVerifyListener(Swt.INTEGER_VERIFIER);
 
         continueB.addSelectionListener(new SelectionAdapter() {
             @Override
@@ -132,8 +139,12 @@ public class Registration {
         Swt.newLabel(p2, null, I18n.get("ftpPort"));
         ftpPortT = Swt.newText(p2, "wrap", "43210");
 
+        Swt.newLabel(p2, null, "Service port:");
+        servicePortT = Swt.newText(p2, "wrap", Integer.toString(
+                (int)(Math.random() * 30000) + 30000));
+
         Swt.newLabel(p2, null, "Key pair:");
-        final Text keyT = Swt.newText(p2, "span 2", null);
+        keyPairT = Swt.newText(p2, "span 2", null);
         Button loadB = Swt.newButton(p2, "wrap push", "Load");
 
         Button genB = Swt.newButton(p2, "span 3, align left",
@@ -157,6 +168,7 @@ public class Registration {
         Swt.connectTo(mod, spaceToBeUsedValL, blocksToStoreT);
         
         ftpPortT.addVerifyListener(Swt.INTEGER_VERIFIER);
+        servicePortT.addVerifyListener(Swt.INTEGER_VERIFIER);
         doneB.addSelectionListener(new SelectionAdapter() {
             @Override
             public void widgetSelected(SelectionEvent e) {
@@ -170,7 +182,7 @@ public class Registration {
                 if (ret == null)
                     return;
 
-                keyT.setText(((File) ret[0]).getAbsolutePath());
+                keyPairT.setText(((File) ret[0]).getAbsolutePath());
                 rsaKeyPair = (RsaKeyPair) ret[1];
             }
         });
@@ -189,14 +201,16 @@ public class Registration {
     public void loopUntilClosed() {
         Swt.centerShell(shell);
         shell.open();
-        while (!shell.isDisposed())
-            if (!display.readAndDispatch())
-                display.sleep();
-        display.dispose();
+
+        Swt.loopUntilClosed(display, shell);
     }
 
     public boolean isRegisteredSuccessfully() {
         return registeredSuccessfully;
+    }
+
+    public File getConfigFile() {
+        return configFile;
     }
 
     private void stepTwo() {
@@ -218,17 +232,35 @@ public class Registration {
             return;
         }
 
-        minBlocks = serverInfo.minimumBlocks;
-        int defaultBlocks = minBlocks * 2;
+        // If a testing code is inputed, fill in the fields.
+        String testingCode = testingCodeT.getText();
+        if (!testingCode.isEmpty()) {
+            int code = Integer.parseInt(testingCode);
+            ftpPortT.setText(Integer.toString(3000 + code));
+            servicePortT.setText(Integer.toString(20000 + code));
 
-        blocksToStoreS.setMaximum(minBlocks * 10);
-        blocksToStoreS.setMinimum(minBlocks);
+            rsaKeyPair = generateDummyKeyPair();
+
+            File dir = new File(System.getProperty("user.dir"), testingCode);
+            dir.mkdirs();
+            File file = new File(dir, "dummy.keypair");
+            try {
+                Json.toFile(file, rsaKeyPair);
+            } catch (IOException ex) {
+                NeguraLog.severe(ex);
+            }
+
+            keyPairT.setText(file.getAbsolutePath());
+        }
+
+        blocksToStoreS.setMaximum(serverInfo.maximumBlocks);
+        blocksToStoreS.setMinimum(serverInfo.minimumBlocks);
         blocksToStoreS.setIncrement(8);
         serverNameValL.setText(serverInfo.name);
         blockSizeValL.setText(Util.bytesWithUnit(
                 serverInfo.blockSize, 0));
-        minBlocksValL.setText(Integer.toString(minBlocks));
-        blocksToStoreT.setText(Integer.toString(defaultBlocks));
+        minBlocksValL.setText(Integer.toString(serverInfo.minimumBlocks));
+        blocksToStoreT.setText(Integer.toString(serverInfo.minimumBlocks));
 
         stackLayout.topControl = p2;
         shell.setDefaultButton(doneB);
@@ -246,13 +278,15 @@ public class Registration {
     private void stepThree() {
         // Verifing that all the supplied data is valid.
         int numberOfBlocks = -1;
-        int servicePort = (int)(Math.random() * 30000) + 30000;
         int ftpPort = -1;
+        int servicePort = -1;
 
         try {
             numberOfBlocks = Integer.parseInt(blocksToStoreT.getText());
         } catch (NumberFormatException ex) { }
-        if (numberOfBlocks < minBlocks) {
+
+        if (numberOfBlocks < serverInfo.minimumBlocks ||
+                numberOfBlocks > serverInfo.maximumBlocks) {
             MsgBox.warning(shell, I18n.get("invalidNumberOfBlocks"));
             return;
         }
@@ -265,29 +299,36 @@ public class Registration {
             return;
         }
 
+        try {
+            servicePort = Integer.parseInt(servicePortT.getText());
+        } catch (NumberFormatException ex) { }
+        if (servicePort < 1 || servicePort >= (256 * 256)) {
+            MsgBox.warning(shell, "Invalid service port.");
+            return;
+        }
+
         if (rsaKeyPair == null) {
             MsgBox.warning(shell, "You have to load a key pair.");
             return;
         }
 
-        // Creating the directories if they need to be created.
-        File dataDir = Os.getUserDataDir(I18n.get("applicationShortName"));
-        File configFileDir = Os.getUserConfigDir(
-                I18n.get("applicationShortName"));
+        File dataDir;
+        File configFileDir;
+
+        String testingCode = testingCodeT.getText();
+        if (testingCode.isEmpty()) {
+            File[] userDirs = getUserDirs();
+            if (userDirs == null)
+                return; // The messages were generated in that function.\
+            
+            dataDir = userDirs[0];
+            configFileDir = userDirs[1];
+        } else {
+            dataDir = new File(System.getProperty("user.dir"), testingCode);
+            configFileDir = dataDir;
+        }
         
-        if (!dataDir.exists() && !dataDir.mkdirs()) {
-            MsgBox.error(shell, I18n.format("failedDataDir",
-                    dataDir.getAbsoluteFile()));
-            shell.dispose();
-            return;
-        }
-        if (!configFileDir.exists() && !configFileDir.mkdirs()) {
-            MsgBox.error(shell, I18n.format("failedConfigDir",
-                    configFileDir.getAbsoluteFile()));
-            shell.dispose();
-            return;
-        }
-        File configFile = new File(configFileDir, "config.json");
+        configFile = new File(configFileDir, "config.json");
 
         //RsaKeyPair rsaKeyPair = new RsaKeyPair();
         KeyPair keyPair = Rsa.generateKeyPair(1024);
@@ -296,7 +337,6 @@ public class Registration {
             shell.dispose();
             return;
         }
-
 
         JsonObject regMsg = Comm.newMessage("registration");
         regMsg.addProperty("public-key", Rsa.toString(keyPair.getPublic()));
@@ -354,6 +394,62 @@ public class Registration {
         MsgBox.info(shell, I18n.get("successRegistration"));
         registeredSuccessfully = true;
         shell.dispose();
+    }
+
+    private File[] getUserDirs() {
+        // Creating the directories if they need to be created.
+        File dataDir = Os.getUserDataDir(I18n.get("applicationShortName"));
+        File configFileDir = Os.getUserConfigDir(
+                I18n.get("applicationShortName"));
+
+        if (!dataDir.exists() && !dataDir.mkdirs()) {
+            MsgBox.error(shell, I18n.format("failedDataDir",
+                    dataDir.getAbsoluteFile()));
+            shell.dispose();
+            return null;
+        }
+
+        if (!configFileDir.exists() && !configFileDir.mkdirs()) {
+            MsgBox.error(shell, I18n.format("failedConfigDir",
+                    configFileDir.getAbsoluteFile()));
+            shell.dispose();
+            return null;
+        }
+
+        return new File[]{dataDir, configFileDir};
+    }
+
+    private RsaKeyPair generateDummyKeyPair() {
+        KeyPair keyPair = Rsa.generateKeyPair(1024);
+        RSAPrivateKey privateKey = (RSAPrivateKey) keyPair.getPrivate();
+        RSAPublicKey publicKey = (RSAPublicKey) keyPair.getPublic();
+
+        String password = "dummyPassword";
+        int repetitions = 1000;
+
+        RsaKeyPair ret = RsaKeyPair.createNewPair(publicKey, privateKey,
+                password, repetitions);
+        ret.transformToStored(password, ret.getRepetitions() / 4);
+
+        return ret;
+    }
+
+    private String genTestingCode() {
+        File userDir = new File(System.getProperty("user.dir"));
+
+        File first = new File(userDir, "0");
+        if (!first.exists()) {
+            return "";
+        }
+
+        for (int i = 1; true; i++) {
+            String code = Integer.toString(i);
+            File codeF = new File(userDir, code);
+
+            if (!codeF.exists()) {
+                return code;
+            }
+        }
     }
 
     // Returns the location of the configuration file or null on failure.

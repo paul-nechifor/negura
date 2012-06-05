@@ -6,8 +6,7 @@ import negura.common.data.RsaKeyPair;
 import negura.common.data.ThreadPoolOptions;
 import negura.common.gui.KeyGenerationWindow;
 import negura.common.gui.Swt;
-import negura.common.util.MsgBox;
-import negura.common.util.NeguraLog;
+import negura.common.gui.MsgBox;
 import negura.common.util.Util;
 import negura.server.ServerConfigManager;
 import negura.server.ServerConfigManager.Builder;
@@ -230,11 +229,13 @@ public class ConfigMaker {
 
     private void step2() {
         builder.serverInfo.name = serverNameT.getText();
-        builder.serverInfo.blockSize =
-                optionsInt[blockSizeC.getSelectionIndex()];
+        builder.serverInfo.blockSize
+                = optionsInt[blockSizeC.getSelectionIndex()];
         builder.virtualDiskBlocks = Integer.parseInt(diskBlocksT.getText());
-        builder.serverInfo.minimumBlocks =
-                Integer.parseInt(minBlocksT.getText());
+        builder.serverInfo.minimumBlocks
+                = Integer.parseInt(minBlocksT.getText());
+        builder.serverInfo.maximumBlocks
+                = Integer.parseInt(diskBlocksT.getText());
         builder.port = Integer.parseInt(portT.getText());
         builder.serverInfo.checkInTime =
                 Integer.parseInt(checkInTimeT.getText());

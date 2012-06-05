@@ -8,8 +8,10 @@ import java.io.IOException;
 import negura.common.data.RsaKeyPair;
 import negura.common.ex.NeguraEx;
 import negura.common.gui.KeyPairUnlocker;
+import negura.common.gui.PanicBox;
 import negura.common.net.RequestServer;
 import negura.common.util.NeguraLog;
+import negura.common.util.NeguraLog.SevereHandler;
 import negura.server.gui.MainWindow;
 
 public class NeguraServer {
@@ -20,7 +22,20 @@ public class NeguraServer {
     private final RequestServer requestServer;
     private final Announcer announcer;
 
+    private final SevereHandler severeHandler = new SevereHandler() {
+        public void terminateFor(String message, Throwable throwable) {
+            // Try to close but ignore errors.
+            try {
+                shutdown();
+            } catch (Exception ex) { }
+
+            PanicBox.show(message, throwable);
+        }
+    };
+
     public NeguraServer(File configFile, boolean cli) throws NeguraEx {
+        NeguraLog.setSevereHandler(severeHandler);
+
         ServerConfigManager manager = null;
         try {
             manager = new ServerConfigManager(configFile, this);

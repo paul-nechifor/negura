@@ -2,7 +2,6 @@ package negura.common.gui;
 
 import negura.common.data.RsaKeyPair;
 import negura.common.ex.NeguraError;
-import negura.common.util.MsgBox;
 import org.eclipse.swt.widgets.Display;
 import org.eclipse.swt.widgets.Shell;
 

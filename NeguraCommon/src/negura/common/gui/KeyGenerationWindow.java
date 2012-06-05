@@ -7,7 +7,6 @@ import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import negura.common.data.RsaKeyPair;
 import negura.common.json.Json;
-import negura.common.util.MsgBox;
 import negura.common.util.Os;
 import negura.common.util.Rsa;
 import net.miginfocom.swt.MigLayout;

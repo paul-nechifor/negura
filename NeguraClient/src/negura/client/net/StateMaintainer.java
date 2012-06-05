@@ -108,8 +108,10 @@ public class StateMaintainer extends Service implements BlockList.OutListener {
         for (JsonElement e : resp.getAsJsonArray("operations")) {
             ops.add(Json.fromJsonObject(e.getAsJsonObject(), Operation.class));
         }
-
-        fsView.addOperations(ops);
+        
+        if (!ops.isEmpty()) {
+            fsView.addOperations(ops);
+        }
     }
 
     private void blockListUpdate() {

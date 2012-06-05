@@ -108,7 +108,7 @@ public class Announcer extends Service {
             try {
                 Comm.readMessage(socketAddress, mesg);
             } catch (IOException ex) {
-                NeguraLog.warning(ex);
+                NeguraLog.info("User %s isn't online.", socketAddress);
             }
         }
     }
@@ -126,8 +126,8 @@ public class Announcer extends Service {
         for (InetSocketAddress a : recentUsers) {
             try {
                 Comm.readMessage(a, mesg);
-            } catch (Exception ex) {
-                NeguraLog.warning(ex);
+            } catch (IOException ex) {
+                NeguraLog.info("User %s isn't online.", a);
             }
         }
 

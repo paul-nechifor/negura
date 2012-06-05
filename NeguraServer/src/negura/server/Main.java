@@ -67,7 +67,8 @@ public class Main {
         if (line.hasOption("config")) {
             configFile = new File(line.getOptionValue("config"));
         } else {
-            configFile = Os.getUserConfigDir("neguraserver", "server.json");
+            //configFile = Os.getUserConfigDir("neguraserver", "config.json");
+            configFile = new File("server.json");
         }
 
         // If the configuration file doesn't exist, create it.

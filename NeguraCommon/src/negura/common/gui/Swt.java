@@ -120,51 +120,65 @@ public class Swt {
         try {
             T t = type.getDeclaredConstructor(Composite.class, int.class)
                     .newInstance(c, i);
+
             if (layoutData != null)
                 t.setLayoutData(layoutData);
+
             return t;
         } catch (Exception ex) { throw new AssertionError(); }
     }
 
     public static Label newLabel(Composite c, String layout, String text) {
         Label ret = n(Label.class, c, SWT.LEFT, layout);
+
         if (text != null)
             ret.setText(text);
+
         return ret;
     }
 
     public static Label newRLabel(Composite c, String layout, String text) {
         Label ret = n(Label.class, c, SWT.RIGHT, layout);
+
         if (text != null)
             ret.setText(text);
+
         return ret;
     }
     public static Text newText(Composite c, String layout, String text) {
         Text ret = n(Text.class, c, SWT.BORDER, layout);
+
         if (text != null)
             ret.setText(text);
+
         return ret;
     }
 
     public static Text newMulti(Composite c, String layout, String text) {
         Text ret = n(Text.class, c, SWT.BORDER | SWT.MULTI | SWT.VERTICAL,
                 layout);
+
         if (text != null)
             ret.setText(text);
+
         return ret;
     }
 
     public static Text newPassword(Composite c, String layout, String text) {
         Text ret = n(Text.class, c, SWT.BORDER | SWT.PASSWORD, layout);
+
         if (text != null)
             ret.setText(text);
+
         return ret;
     }
 
     public static Button newButton(Composite c, String layout, String text) {
         Button ret = n(Button.class, c, SWT.PUSH, layout);
+
         if (text != null)
             ret.setText(text);
+
         return ret;
     }
 
@@ -182,44 +196,54 @@ public class Swt {
 
     public static Button newCheckBox(Composite c, String layout, String text) {
         Button ret = n(Button.class, c, SWT.CHECK, layout);
+
         if (text != null)
             ret.setText(text);
+
         return ret;
     }
 
     public static Combo newCombo(Composite c, String layout,
             String[] items, int selected) {
         Combo ret = n(Combo.class, c, SWT.READ_ONLY, layout);
+
         if (items != null)
             ret.setItems(items);
         if (selected >= 0)
             ret.select(selected);
+
         return ret;
     }
 
     public static Scale newHScale(Composite c, String layout, int min,
             int max, int increment) {
         Scale ret = n(Scale.class, c, SWT.HORIZONTAL, layout);
+
         // The maximum has to be set first because setting the minimum checks to
         // see that it isn't greater than the maximum.
         ret.setMaximum(max);
         ret.setMinimum(min);
         ret.setIncrement(increment);
+
         return ret;
     }
 
     public static ProgressBar newHProgressBar(Composite c, String layout,
             int min, int max) {
         ProgressBar ret = n(ProgressBar.class, c, SWT.HORIZONTAL, layout);
+
         ret.setMaximum(max);
         ret.setMinimum(min);
+
         return ret;
     }
 
     public static Group newGroup(Composite c, String layout, String text) {
         Group ret = n(Group.class, c, SWT.NONE, layout);
+
         if (text != null)
             ret.setText(text);
+
         return ret;
     }
 
@@ -253,8 +277,10 @@ public class Swt {
 
     public static FillLayout singletonLayout(int marginHoriz, int marginVert) {
         FillLayout ret = new FillLayout();
+
         ret.marginWidth = marginHoriz;
         ret.marginHeight = marginVert;
+
         return ret;
     }
 
@@ -337,8 +363,10 @@ public class Swt {
     public static Font getFontWithDifferentHeight(Display display, Font font,
             int newHeight) {
         FontData[] fontData = font.getFontData();
+
         for (int i = 0; i < fontData.length; ++i)
             fontData[i].setHeight(newHeight);
+
         return new Font(display, fontData);
     }
 
@@ -364,9 +392,13 @@ public class Swt {
      * @param shell         The shell for which to wait.
      */
     public static void loopUntilClosed(Display display, Shell shell) {
-        while (!shell.isDisposed())
-            if (!display.readAndDispatch())
+        while (!shell.isDisposed()) {
+            if (!display.readAndDispatch()) {
                 display.sleep();
+            }
+        }
+        
+        shell.dispose();
         display.dispose();
     }
 }

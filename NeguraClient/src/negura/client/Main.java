@@ -27,8 +27,11 @@ public class Main {
             if (!configFile.exists()) {
                 Registration r = new Registration();
                 r.loopUntilClosed();
+
                 if (!r.isRegisteredSuccessfully())
                     return;
+
+                configFile = r.getConfigFile();
             }
         } else {
             if (args[0].equals("autoreg") && args.length == 4) {

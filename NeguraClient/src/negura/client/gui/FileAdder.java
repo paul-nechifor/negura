@@ -10,7 +10,7 @@ import negura.common.data.Operation;
 import negura.common.ex.NeguraEx;
 import negura.common.gui.Swt;
 import negura.common.gui.Window;
-import negura.common.util.MsgBox;
+import negura.common.gui.MsgBox;
 import negura.common.util.NeguraLog;
 import negura.common.util.Os;
 import net.miginfocom.swt.MigLayout;
