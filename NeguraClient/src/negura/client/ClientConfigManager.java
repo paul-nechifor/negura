@@ -15,6 +15,7 @@ import negura.common.data.RsaKeyPair;
 import negura.common.data.ServerInfo;
 import negura.common.data.ThreadPoolOptions;
 import negura.common.data.TrafficAggregator;
+import negura.common.data.TrafficLogger;
 import negura.common.json.Json;
 import negura.common.util.NeguraLog;
 
@@ -41,6 +42,7 @@ public class ClientConfigManager {
         // These cannot be initialized by the builder, but are stored for JSON
         // serialization.
         private List<Operation> operations = new ArrayList<Operation>();
+        private TrafficLogger.Builder trafficLoggerBuilder;
         private BlockList.Builder blockListBuilder
                 = new BlockList.Builder();
         private final TrafficAggregator trafficAggregator
@@ -116,6 +118,7 @@ public class ClientConfigManager {
 
     // Final objects.
     private final Builder builder;
+    private final TrafficLogger.Builder trafficLoggerBuilder;
     private final TrafficAggregator trafficAggregator;
     private final PeerCache peerCache;
     private final BlockCache blockCache;
@@ -144,8 +147,9 @@ public class ClientConfigManager {
         this.logFile = builder.logFile;
 
         // Initializing final objects.
-        this.trafficAggregator = builder.trafficAggregator;
         this.builder = builder;
+        this.trafficLoggerBuilder = builder.trafficLoggerBuilder;
+        this.trafficAggregator = builder.trafficAggregator;
         this.peerCache = new PeerCache(this);
         this.blockCache = new BlockCache(this, trafficAggregator, blockSize);
         this.blockList = new BlockList(builder.blockListBuilder, this.dataDir);
@@ -161,6 +165,12 @@ public class ClientConfigManager {
 
     public void save() throws IOException {
         builder.blockListBuilder = blockList.toBuilder();
+        if (negura == null) {
+            builder.trafficLoggerBuilder = new TrafficLogger.Builder();
+        } else {
+            builder.trafficLoggerBuilder
+                    = negura.getTrafficLogger().getBuilder();
+        }
         builder.operations = fsView.getOperations();
 
         Json.toFile(builder.configFile, builder);
@@ -184,6 +194,10 @@ public class ClientConfigManager {
 
     public final Negura getNegura() {
         return negura;
+    }
+
+    public final TrafficLogger.Builder getTrafficLoggerBuilder() {
+        return trafficLoggerBuilder;
     }
 
     public final TrafficAggregator getTrafficAggregator() {

@@ -5,6 +5,7 @@ import negura.client.ClientConfigManager;
 import negura.client.Negura;
 import negura.common.data.BlockList;
 import negura.common.data.TrafficAggregator;
+import negura.common.data.TrafficLogger;
 import negura.common.gui.Swt;
 import negura.common.gui.Window;
 import net.miginfocom.swt.MigLayout;
@@ -65,9 +66,13 @@ public class Statistics extends Window {
 
     private static final int UPDATE_INTERVAL = 1000;
 
-    private final Display display;
     private final ClientConfigManager cm;
+    private final Display display;
     private final ChartCanvas chartWidget;
+    private final BlockList blockList;
+    private final Negura negura;
+    private final TrafficAggregator trafficAggregator;
+    private final TrafficLogger trafficLogger;
     private final Runnable callUpdateValues = new Runnable() {
         public void run() {
             updateValues();
@@ -79,6 +84,11 @@ public class Statistics extends Window {
         super(new Shell(display));
         this.cm = cm;
         this.display = display;
+
+        blockList = cm.getBlockList();
+        negura = cm.getNegura();
+        trafficAggregator = cm.getTrafficAggregator();
+        trafficLogger = negura.getTrafficLogger();
 
         shell.setText("Statistics");
         shell.setSize(840, 650);
@@ -134,13 +144,12 @@ public class Statistics extends Window {
     }
 
     private void fillGroupWithLabels(Group group, LabelValue... labelValues) {
-        group.setLayout(new MigLayout("insets 5", "[left][fill]"));
+        group.setLayout(new MigLayout("insets 5", "[left][100::, fill]"));
 
         for (LabelValue labelValue: labelValues) {
             Swt.newLabel(group, null, labelValue.description);
             // TODO: Fix this.
-            labelValue.setLabel(Swt.newLabel(group, "wrap",
-                    "                                                       "));
+            labelValue.setLabel(Swt.newLabel(group, "wrap", null));
         }
     }
 
@@ -148,10 +157,6 @@ public class Statistics extends Window {
         if (isDisposed()) {
             return;
         }
-
-        BlockList blockList = cm.getBlockList();
-        Negura negura = cm.getNegura();
-        TrafficAggregator trafficAggregator = cm.getTrafficAggregator();
 
         BlocksStored.setText(cm.getStoredBlocks());
         BlocksAllocated.setText(blockList.getAllocatedNumber());
@@ -163,13 +168,21 @@ public class Statistics extends Window {
         long csDown = trafficAggregator.getSessionDown();
         long csUp = trafficAggregator.getSessionUp();
         long csTime = System.nanoTime() - trafficAggregator.getSessionStart();
+        long csActiveTimeDown = trafficLogger.getSessionActiveTimeDown();
+        long csActiveTimeUp = trafficLogger.getSessionActiveTimeUp();
         
         long atDown = csDown + trafficAggregator.getPreviousDown();
         long atUp = csUp + trafficAggregator.getPreviousUp();
         long atTime = csTime + trafficAggregator.getPreviousTime();
+        long atActiveTimeDown = csActiveTimeDown +
+                trafficLogger.getPreviousActiveTimeDown();
+        long atActiveTimeUp = csActiveTimeUp +
+                trafficLogger.getPreviousActiveTimeUp();
 
-        String[] csStrings = calcFiveValues(csDown, csUp, csTime);
-        String[] atStrings = calcFiveValues(atDown, atUp, atTime);
+        String[] csStrings = calcFiveValues(csDown, csUp, csTime,
+                csActiveTimeDown, csActiveTimeUp);
+        String[] atStrings = calcFiveValues(atDown, atUp, atTime,
+                atActiveTimeDown, atActiveTimeUp);
 
         CsDownloaded.setText(csStrings[0]);
         CsUploaded.setText(csStrings[1]);
@@ -189,16 +202,31 @@ public class Statistics extends Window {
         display.timerExec(UPDATE_INTERVAL, callUpdateValues);
     }
 
-    private String[] calcFiveValues(long down, long up, long time) {
+    private String[] calcFiveValues(long down, long up, long time,
+            long activeTimeDown, long activeTimeUp) {
         String[] ret = new String[5];
 
-        long seconds = time / 1000000000;
+        final int NANO = 1000000000;
+
+        long avgBytesDown;
+        if (activeTimeDown == 0) {
+            avgBytesDown = 0;
+        } else {
+            avgBytesDown = down / (activeTimeDown / NANO);
+        }
+
+        long avgBytesUp;
+        if (activeTimeUp == 0) {
+            avgBytesUp = 0;
+        } else {
+            avgBytesUp = up / (activeTimeUp / NANO);
+        }
 
         ret[0] = Util.bytesWithUnit(down, 2);
         ret[1] = Util.bytesWithUnit(up, 2);
-        ret[2] = Util.timeInterval(seconds);
-        ret[3] = Util.bytesWithUnit(down / seconds, 2) + "/s";
-        ret[4] = Util.bytesWithUnit(up / seconds, 2) + "/s";
+        ret[2] = Util.timeInterval(time / NANO);
+        ret[3] = Util.bytesWithUnit(avgBytesDown, 2) + "/s";
+        ret[4] = Util.bytesWithUnit(avgBytesUp, 2) + "/s";
 
         return ret;
     }

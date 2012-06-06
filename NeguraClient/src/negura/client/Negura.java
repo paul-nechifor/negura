@@ -1,9 +1,6 @@
 /*
  * TODO: I should support both IPv4 and IPv6 addresses.
  *
- * TODO: A user shouldn't be able to choose to store more blocks than there are
- * in the file system.
- *
  * TODO: When Negura starts I should perform a check to see if all the blocks
  * exist etc.
  *
@@ -12,8 +9,6 @@
  * TODO: User joins in DataManager.
  *
  * TODO: Why are the blocks added to completed but not send imediatly?
- *
- * TODO: Blocks aren't given if you registered after the files were added.
  */
 
 package negura.client;
@@ -89,7 +84,8 @@ public class Negura {
         }
 
         cm = manager;
-        trafficLogger = new TrafficLogger(cm.getTrafficAggregator(), 0.5, 120);
+        trafficLogger = new TrafficLogger(cm.getTrafficAggregator(),
+                cm.getTrafficLoggerBuilder(), 0.5, 120);
         ClientRequestHandler handler = new ClientRequestHandler(cm);
         requestServer = new RequestServer(cm.getServicePort(),
                 cm.getThreadPoolOptions(), handler);
