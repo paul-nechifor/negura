@@ -1,3 +1,7 @@
+# This repository has been moved to [gitlab.com/paul-nechifor/negura](http://gitlab.com/paul-nechifor/negura).
+
+Old readme:
+
 # Negura
 
 Negura is a distributed file system based on peer-to-peer networking written in
